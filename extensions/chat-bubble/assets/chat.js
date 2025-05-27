@@ -7,7 +7,19 @@
 (function() {
   'use strict';
 
-  const API_BASE_URL = typeof window.shopAiApiBaseUrl !== 'undefined' ? window.shopAiApiBaseUrl : 'https://pb-chat-git.vercel.app';
+  console.log("Initial window.shopAiApiBaseUrl:", typeof window.shopAiApiBaseUrl !== 'undefined' ? window.shopAiApiBaseUrl : "NOT DEFINED");
+
+  let determinedApiBaseUrl = 'https://pb-chat-git.vercel.app'; // Default to Vercel URL
+  if (typeof window.shopAiApiBaseUrl === 'string' && window.shopAiApiBaseUrl.trim() !== '' && window.shopAiApiBaseUrl.trim().toLowerCase() !== 'null') {
+    // Ensure it's a valid looking URL structure if it comes from window var
+    if (window.shopAiApiBaseUrl.startsWith('http://') || window.shopAiApiBaseUrl.startsWith('https://')) {
+      determinedApiBaseUrl = window.shopAiApiBaseUrl.trim();
+    } else {
+      console.warn("window.shopAiApiBaseUrl was not a valid URL, using fallback:", window.shopAiApiBaseUrl);
+    }
+  }
+  const API_BASE_URL = determinedApiBaseUrl;
+  console.log("Chat.js using API_BASE_URL:", API_BASE_URL);
 
   /**
    * Application namespace to prevent global scope pollution
