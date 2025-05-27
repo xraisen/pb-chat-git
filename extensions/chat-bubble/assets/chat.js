@@ -7,6 +7,8 @@
 (function() {
   'use strict';
 
+  const API_BASE_URL = typeof window.shopAiApiBaseUrl !== 'undefined' ? window.shopAiApiBaseUrl : 'https://pb-chat-git.vercel.app';
+
   /**
    * Application namespace to prevent global scope pollution
    */
@@ -391,9 +393,6 @@
      * API communication and data handling
      */
     API: {
-      // Define the base URL, prioritizing window.shopAiApiBaseUrl if available
-      API_BASE_URL: typeof window.shopAiApiBaseUrl !== 'undefined' ? window.shopAiApiBaseUrl : 'https://pb-chat-git.vercel.app',
-
       /**
        * Stream a response from the API
        * @param {string} userMessage - User's message text
@@ -411,7 +410,7 @@
             prompt_type: promptType
           });
 
-          const streamUrl = `${this.API_BASE_URL}/chat`;
+          const streamUrl = `${API_BASE_URL}/chat`;
           const shopId = window.shopId;
 
           const response = await fetch(streamUrl, {
@@ -549,7 +548,7 @@
           messagesContainer.appendChild(loadingMessage);
 
           // Fetch history from the server
-          const historyUrl = `${this.API_BASE_URL}/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
+          const historyUrl = `${API_BASE_URL}/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
           console.log('Fetching history from:', historyUrl);
 
           const response = await fetch(historyUrl, {
@@ -703,7 +702,7 @@
           attemptCount++;
 
           try {
-            const tokenUrl = `${ShopAIChat.API.API_BASE_URL}/auth/token-status?conversation_id=` +
+            const tokenUrl = `${API_BASE_URL}/auth/token-status?conversation_id=` +
               encodeURIComponent(conversationId);
             const response = await fetch(tokenUrl);
 
