@@ -22,7 +22,7 @@ export default function Index() {
               <BlockStack gap="500">
                 <BlockStack gap="200">
                   <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
+                    Welcome 🎉
                   </Text>
                   <Text variant="bodyMd" as="p">
                     This is a reference app that adds a chat agent on your storefront, which is powered via claude and can connect shopify mcp platform.

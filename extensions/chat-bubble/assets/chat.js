@@ -7,6 +7,20 @@
 (function() {
   'use strict';
 
+  console.log("Initial window.shopAiApiBaseUrl:", typeof window.shopAiApiBaseUrl !== 'undefined' ? window.shopAiApiBaseUrl : "NOT DEFINED");
+
+  let determinedApiBaseUrl = 'https://pb-chat-git.vercel.app'; // Default to Vercel URL
+  if (typeof window.shopAiApiBaseUrl === 'string' && window.shopAiApiBaseUrl.trim() !== '' && window.shopAiApiBaseUrl.trim().toLowerCase() !== 'null') {
+    // Ensure it's a valid looking URL structure if it comes from window var
+    if (window.shopAiApiBaseUrl.startsWith('http://') || window.shopAiApiBaseUrl.startsWith('https://')) {
+      determinedApiBaseUrl = window.shopAiApiBaseUrl.trim();
+    } else {
+      console.warn("window.shopAiApiBaseUrl was not a valid URL, using fallback:", window.shopAiApiBaseUrl);
+    }
+  }
+  const API_BASE_URL = determinedApiBaseUrl;
+  console.log("Chat.js using API_BASE_URL:", API_BASE_URL);
+
   /**
    * Application namespace to prevent global scope pollution
    */
@@ -408,7 +422,7 @@
             prompt_type: promptType
           });
 
-          const streamUrl = '/chat';
+          const streamUrl = `${API_BASE_URL}/chat`;
           const shopId = window.shopId;
 
           const response = await fetch(streamUrl, {
@@ -546,7 +560,7 @@
           messagesContainer.appendChild(loadingMessage);
 
           // Fetch history from the server
-          const historyUrl = `/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
+          const historyUrl = `${API_BASE_URL}/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
           console.log('Fetching history from:', historyUrl);
 
           const response = await fetch(historyUrl, {
@@ -700,7 +714,7 @@
           attemptCount++;
 
           try {
-            const tokenUrl = '/auth/token-status?conversation_id=' +
+            const tokenUrl = `${API_BASE_URL}/auth/token-status?conversation_id=` +
               encodeURIComponent(conversationId);
             const response = await fetch(tokenUrl);
 
