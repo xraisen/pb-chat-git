@@ -8,6 +8,7 @@ embedded = true
 
 [build]
 include_config_on_deploy = true
+automatically_update_urls_on_dev = false
 
 [webhooks]
 api_version = "2025-04"
@@ -23,6 +24,4 @@ redirect_urls = [ "https://pb-chat-git.vercel.app/api/auth" ]
 embedded = false
 
 [mcp.customer_authentication]
-redirect_uris = [
-  "https://pb-chat-git.vercel.app/callback"
-]
+redirect_uris = [ "https://pb-chat-git.vercel.app/callback" ]

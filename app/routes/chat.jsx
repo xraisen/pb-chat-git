@@ -197,16 +197,14 @@ async function handleChatSession({
     // The streamGeminiConversation is designed to directly use stream.sendMessage
     // for SSE events like 'chunk', 'id', 'message_complete', 'error', 'end_turn'.
     // It does not use onText, onMessage, onToolUse callbacks in the same way Claude SDK did.
-    
+
     // We need to collect the full assistant message to save it.
     let assistantResponseText = "";
-    const originalSendMessage = stream.sendMessage;
+    let geminiToolCallEventData = null; // To store data from gemini_tool_call event
 
     // Wrap sendMessage to intercept chunks and build the full response
     // and to handle message saving.
-    let assistantResponseText = "";
     const originalSendMessage = stream.sendMessage;
-    let geminiToolCallEventData = null; // To store data from gemini_tool_call event
 
     stream.sendMessage = (data) => {
       if (data.type === 'gemini_tool_call') {
@@ -415,13 +413,15 @@ async function getCustomerMcpEndpoint(shopDomain, conversationId) {
       `#graphql
       query shop {
         shop {
-          customerAccountUrl
+          customerAccountsV2 {
+            url
+          }
         }
       }`,
     );
 
     const body = await response.json();
-    const customerAccountUrl = body.data.shop.customerAccountUrl;
+    const customerAccountUrl = body.data.shop.customerAccountsV2.url;
 
     // Store the customer account URL with conversation ID in the DB
     await storeCustomerAccountUrl(conversationId, customerAccountUrl);
