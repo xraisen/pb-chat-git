@@ -38,6 +38,7 @@
     llmProvider: {{ block.settings.llm_provider | json }}
   };
   window.shopId = {{ shop.id }};
+     window.shopAiApiBaseUrl = {{ app.url | json }};
 </script>
 
 {% schema %}
