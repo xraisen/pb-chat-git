@@ -7,13 +7,13 @@
     bottom: 20px;
     right: 20px;
     z-index: 9999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: "Montserrat", "Lato", "Open Sans", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 
   .shop-ai-chat-bubble {
     width: 60px;
     height: 60px;
-    background-color: #5046e4;
+    background-color: #E57399;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -56,8 +56,8 @@
     max-height: 650px;
     min-height: 350px;
     background-color: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -132,7 +132,7 @@
 
   .shop-ai-chat-header {
     padding: 16px;
-    background-color: #5046e4;
+    background-color: #E57399;
     color: white;
     font-weight: 600;
     display: flex;
@@ -163,7 +163,7 @@
   .shop-ai-message {
     max-width: 80%;
     padding: 12px 16px;
-    border-radius: 18px;
+    border-radius: 8px;
     font-size: 14px;
     line-height: 1.4;
     word-wrap: break-word;
@@ -184,12 +184,13 @@
 
   .shop-ai-message.assistant {
     align-self: flex-start;
-    background-color: #f1f1f1;
-    border-bottom-left-radius: 4px;
+    background-color: #F8F9FA;
+    color: #333333;
+    border-bottom-left-radius: 2px;
   }
 
   .shop-ai-message.assistant a {
-    color: #5046e4;
+    color: #E57399;
     text-decoration: underline;
     font-weight: 500;
     word-break: break-word;
@@ -246,9 +247,9 @@
 
   .shop-ai-message.user {
     align-self: flex-end;
-    background-color: #5046e4;
+    background-color: #E57399;
     color: white;
-    border-bottom-right-radius: 4px;
+    border-bottom-right-radius: 2px;
   }
   
   .shop-ai-message.user a {
@@ -287,11 +288,11 @@
   }
 
   .shop-ai-chat-input input:focus {
-    border-color: #5046e4;
+    border-color: #E57399;
   }
 
   .shop-ai-chat-send {
-    background-color: #5046e4;
+    background-color: #E57399;
     color: white;
     border: none;
     border-radius: 50%;
@@ -309,8 +310,8 @@
     gap: 4px;
     padding: 8px 16px;
     background-color: #f1f1f1;
-    border-radius: 18px;
-    border-bottom-left-radius: 4px;
+    border-radius: 8px;
+    border-bottom-left-radius: 2px;
     align-self: flex-start;
     font-size: 14px;
   }
@@ -334,7 +335,7 @@
 
   /* Authentication link styles */
 .shop-auth-trigger {
-    color: #5046e4;
+    color: #E57399;
     text-decoration: underline;
     font-weight: 500;
     cursor: pointer;
@@ -449,14 +450,14 @@
     margin: 0 0 10px 0;
     font-size: 14px;
     font-weight: 600;
-    color: #5046e4;
+    color: #E57399;
   }
   
   /* Add to Cart Button Styling */
   .shop-ai-add-to-cart {
     width: 100%;
     padding: 8px 0;
-    background-color: #5046e4;
+    background-color: #E57399;
     color: white;
     border: none;
     border-radius: 4px;
@@ -467,7 +468,7 @@
   }
   
   .shop-ai-add-to-cart:hover {
-    background-color: #3f36c0;
+    background-color: #D46A8A;
   }
   
   /* Responsive adjustments for small screens */
