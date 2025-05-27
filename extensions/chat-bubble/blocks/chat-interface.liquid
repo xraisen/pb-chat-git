@@ -34,7 +34,8 @@
 <script>
   window.shopChatConfig = {
     promptType: {{ block.settings.system_prompt | json }},
-    welcomeMessage: {{ block.settings.welcome_message | json }}
+    welcomeMessage: {{ block.settings.welcome_message | json }},
+    llmProvider: {{ block.settings.llm_provider | json }}
   };
   window.shopId = {{ shop.id }};
 </script>
@@ -71,6 +72,22 @@
         }
       ],
       "default": "standardAssistant"
+    },
+    {
+      "type": "select",
+      "id": "llm_provider",
+      "label": "LLM Provider",
+      "options": [
+        {
+          "value": "claude",
+          "label": "Claude"
+        },
+        {
+          "value": "gemini",
+          "label": "Gemini"
+        }
+      ],
+      "default": "gemini"
     }
   ]
 }

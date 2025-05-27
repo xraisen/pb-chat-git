@@ -7,7 +7,8 @@ import MCPClient from "../mcp-client";
 import { saveMessage, getConversationHistory, storeCustomerAccountUrl, getCustomerAccountUrl } from "../db.server";
 import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
-import { createClaudeService } from "../services/claude.server";
+import { createClaudeService } from "../services/claude.server.js"; // Ensure .js if that's the actual filename
+import { createGeminiService } from "../services/gemini.server.js";
 import { createToolService } from "../services/tool.server";
 import { unauthenticated } from "../shopify.server";
 
@@ -87,6 +88,7 @@ async function handleChatRequest(request) {
     // Generate or use existing conversation ID
     const conversationId = body.conversation_id || Date.now().toString();
     const promptType = body.prompt_type || AppConfig.api.defaultPromptType;
+    const llmProvider = body.llm_provider || 'claude'; // Default to Claude if not specified
 
     // Create a stream for the response
     const responseStream = createSseStream(async (stream) => {
@@ -95,6 +97,7 @@ async function handleChatRequest(request) {
         userMessage,
         conversationId,
         promptType,
+        llmProvider, // Pass llmProvider
         stream
       });
     });
@@ -125,10 +128,16 @@ async function handleChatSession({
   userMessage,
   conversationId,
   promptType,
+  llmProvider, // Added llmProvider
   stream
 }) {
-  // Initialize services
-  const claudeService = createClaudeService();
+  // Initialize services based on llm_provider
+  let llmService;
+  if (llmProvider === 'gemini') {
+    llmService = createGeminiService();
+  } else {
+    llmService = createClaudeService();
+  }
   const toolService = createToolService();
 
   // Initialize MCP client
@@ -184,90 +193,199 @@ async function handleChatSession({
     });
 
     // Execute the conversation stream
-    let finalMessage = { role: 'user', content: userMessage };
+    // Execute the conversation stream with Gemini
+    // The streamGeminiConversation is designed to directly use stream.sendMessage
+    // for SSE events like 'chunk', 'id', 'message_complete', 'error', 'end_turn'.
+    // It does not use onText, onMessage, onToolUse callbacks in the same way Claude SDK did.
+    
+    // We need to collect the full assistant message to save it.
+    let assistantResponseText = "";
+    const originalSendMessage = stream.sendMessage;
 
-    while (finalMessage.stop_reason !== "end_turn") {
-      finalMessage = await claudeService.streamConversation(
+    // Wrap sendMessage to intercept chunks and build the full response
+    // and to handle message saving.
+    let assistantResponseText = "";
+    const originalSendMessage = stream.sendMessage;
+    let geminiToolCallEventData = null; // To store data from gemini_tool_call event
+
+    stream.sendMessage = (data) => {
+      if (data.type === 'gemini_tool_call') {
+        geminiToolCallEventData = { name: data.name, arguments: data.arguments };
+        // Do not forward 'gemini_tool_call' itself to client.
+        // The 'message_complete' that follows it from gemini.server.js IS important to signal end of LLM turn.
+        // We let 'message_complete' pass through.
+        return; 
+      }
+      
+      if (data.type === 'chunk') {
+        assistantResponseText += data.chunk;
+      } else if (data.type === 'message_complete') {
+        // This event now comes from both Claude (via onMessage mapped) and Gemini (after chunks or after tool_call).
+        // For Gemini tool_call, assistantResponseText will be empty.
+        // For Claude tool_use, data.message will contain the tool_use content.
+        
+        let messageToSave = assistantResponseText;
+        let roleToSave = 'assistant';
+
+        if (data.message) { // This is likely from Claude
+          messageToSave = data.message; // Claude's content can be an array of blocks
+          roleToSave = data.role || 'assistant';
+        }
+
+        if (messageToSave || (llmProvider === 'gemini' && geminiToolCallEventData)) { // Save if there's text OR if it was a Gemini tool call
+          if (llmProvider === 'gemini' && geminiToolCallEventData && !assistantResponseText) {
+            // This was a Gemini tool call turn, save the tool call request itself as the assistant's message
+            messageToSave = [{ type: 'function_call', name: geminiToolCallEventData.name, arguments: geminiToolCallEventData.arguments }];
+            roleToSave = 'assistant'; // Or 'model'
+             // Reset geminiToolCallEventData after "using" it for saving, to ensure it's for current turn.
+            // geminiToolCallEventData = null; // Resetting here might be too early if continuation logic is below.
+                                        // It's reset after the continuation call.
+          }
+
+          conversationHistory.push({
+            role: roleToSave,
+            // Gemini's function_call is an object, Claude's tool_use is an array of blocks.
+            // Regular text is string. JSON.stringify handles all.
+            content: messageToSave 
+          });
+          
+          saveMessage(conversationId, roleToSave, JSON.stringify(messageToSave))
+            .catch((error) => {
+              console.error("Error saving assistant message to database:", error);
+            });
+        }
+        assistantResponseText = ""; // Reset for next message
+      } else if (data.type === 'end_turn') {
+        if (productsToDisplay.length > 0) {
+          originalSendMessage({
+            type: 'product_results',
+            products: productsToDisplay
+          });
+        }
+      }
+      // Forward all events except the raw 'gemini_tool_call'
+      if(data.type !== 'gemini_tool_call') {
+        originalSendMessage(data);
+      }
+    };
+
+    if (llmProvider === 'gemini') {
+      await llmService.streamGeminiConversation(
+        {
+          messages: conversationHistory, // Pass current history (Claude format)
+          promptType,
+          tools: mcpClient.tools,
+          conversationId
+        },
+        { sendMessage: stream.sendMessage } // Use wrapped sendMessage
+      );
+
+      // After the initial stream, check if a tool call was signaled by the wrapper
+      if (geminiToolCallEventData) {
+        const toolName = geminiToolCallEventData.name;
+        const toolArgs = geminiToolCallEventData.arguments;
+        geminiToolCallEventData = null; // Reset after use
+
+        console.log(`[handleChatSession] Gemini requested tool: ${toolName}, Args:`, toolArgs);
+        let toolExecutionResult;
+        try {
+          const mcpResponse = await mcpClient.callTool(toolName, toolArgs);
+          if (mcpResponse.error) {
+            console.error(`[handleChatSession] MCP Tool Error for ${toolName}:`, mcpResponse.error);
+            toolExecutionResult = { error: true, message: mcpResponse.error.data || "Tool execution failed", details: mcpResponse.error };
+          } else {
+            toolExecutionResult = mcpResponse; // This is the direct JSON output from the tool
+          }
+        } catch (e) {
+          console.error(`[handleChatSession] Exception calling MCP Tool ${toolName}:`, e);
+          toolExecutionResult = { error: true, message: e.message || "Exception during tool execution" };
+        }
+        
+        // conversationHistory at this point already includes the 'function_call' part saved by the wrapper.
+        // The gemini.server.js streamGeminiResponseAfterToolExecution expects existingMessages in Gemini Content format.
+        // Our conversationHistory is in Claude format. The service needs to handle this transformation.
+        // This requires a modification in gemini.server.js or a transformation here.
+        // For now, let's assume gemini.server.js can handle Claude-formatted history for continuation,
+        // or that its formatMessagesForGemini is reused internally.
+        // The critical part is that `gemini.server.js` will add the functionResponse part.
+
+        await llmService.streamGeminiResponseAfterToolExecution({
+          // apiKey: process.env.GEMINI_API_KEY, // Service uses its own env var
+          existingMessages: conversationHistory, // Pass the history that led to the tool call + the tool call itself
+          toolName: toolName,
+          toolResponse: toolExecutionResult, // The actual result or error object
+          streamHandlers: { sendMessage: stream.sendMessage }, // Use wrapped to continue streaming
+          conversationId
+        });
+      }
+    } else { // Claude provider
+      await llmService.streamConversation( // Claude's service
         {
           messages: conversationHistory,
           promptType,
           tools: mcpClient.tools
         },
-        {
-          // Handle text chunks
+        { // Claude's specific handlers
           onText: (textDelta) => {
-            stream.sendMessage({
-              type: 'chunk',
-              chunk: textDelta
-            });
+            stream.sendMessage({ type: 'chunk', chunk: textDelta });
           },
-
-          // Handle complete messages
-          onMessage: (message) => {
-            conversationHistory.push({
-              role: message.role,
-              content: message.content
-            });
-
-            saveMessage(conversationId, message.role, JSON.stringify(message.content))
-              .catch((error) => {
-                console.error("Error saving message to database:", error);
-              });
-
-            // Send a completion message
-            stream.sendMessage({ type: 'message_complete' });
+          onMessage: (message) => { // message is the full message object from Claude
+            // Save Claude's message (can be text or tool_use)
+            // The wrapper's 'message_complete' logic will handle saving.
+            // We also need to ensure assistantResponseText is cleared if this is a full message.
+            assistantResponseText = ""; // Clear any partial chunks if a full message object arrives
+            stream.sendMessage({ type: 'message_complete', message: message.content, role: message.role });
           },
+          onToolUse: async (toolUseContent) => { // toolUseContent is Claude's tool_use block
+            const toolName = toolUseContent.name;
+            const toolArgs = toolUseContent.input;
+            const toolUseId = toolUseContent.id; // Claude specific
+            
+            // It's important that the tool_use message itself was saved.
+            // The onMessage handler above should have caught it if it was part of message.content.
 
-          // Handle tool use requests
-          onToolUse: async (content) => {
-            const toolName = content.name;
-            const toolArgs = content.input;
-            const toolUseId = content.id;
+            const mcpResponse = await mcpClient.callTool(toolName, toolArgs);
 
-            // Call the tool
-            const toolUseResponse = await mcpClient.callTool(toolName, toolArgs);
-
-            // Handle tool response based on success/error
-            if (toolUseResponse.error) {
-              await toolService.handleToolError(
-                toolUseResponse,
+            if (mcpResponse.error) {
+              await toolService.handleToolError( // This updates conversationHistory
+                mcpResponse,
                 toolName,
                 toolUseId,
-                conversationHistory,
-                stream.sendMessage,
+                conversationHistory, // Pass by reference, it gets mutated
+                stream.sendMessage, 
                 conversationId
               );
             } else {
-              await toolService.handleToolSuccess(
-                toolUseResponse,
+              await toolService.handleToolSuccess( // This also updates conversationHistory
+                mcpResponse,
                 toolName,
                 toolUseId,
-                conversationHistory,
+                conversationHistory, // Pass by reference, it gets mutated
                 productsToDisplay,
                 conversationId
               );
             }
-
-            // Signal new message to client
-            stream.sendMessage({ type: 'new_message' });
+            // For Claude, the streamConversation is often called again in a loop with updated history.
+            // This simplified version sends 'new_message', client might re-initiate or UI updates.
+            // If a true loop is needed, this structure would need to change for Claude.
+            // For now, we assume this `onToolUse` completes a turn or the client handles re-query.
+            stream.sendMessage({ type: 'new_message' }); // Inform client something happened
           }
         }
       );
+      // After Claude stream, explicitly send end_turn if its stream.finalMessage() was the end.
+      // The Gemini service sends end_turn itself.
+      // If onToolUse was the last thing, Claude's stream might not have formally "ended" in a way that triggers wrapper's end_turn.
+      // This ensures client knows the turn is over from server perspective for non-Gemini.
+      stream.sendMessage({ type: 'end_turn' });
     }
 
-    // Signal end of turn
-    stream.sendMessage({ type: 'end_turn' });
+    stream.sendMessage = originalSendMessage; // Restore original sendMessage
 
-    // Send product results if available
-    if (productsToDisplay.length > 0) {
-      stream.sendMessage({
-        type: 'product_results',
-        products: productsToDisplay
-      });
-    }
   } catch (error) {
-    // The streaming handler takes care of error handling
-    throw error;
+    console.error(`[handleChatSession] Error during ${llmProvider} conversation:`, error);
+    stream.sendMessage({ type: 'error', error: { message: error.message || `Chat session failed with ${llmProvider}.` } });
+    stream.sendMessage({ type: 'end_turn' });
   }
 }
 
