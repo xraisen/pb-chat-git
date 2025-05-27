@@ -402,10 +402,12 @@
 
         try {
           const promptType = window.shopChatConfig?.promptType || "standardAssistant";
+          const llmProvider = window.shopChatConfig?.llmProvider || 'claude';
           const requestBody = JSON.stringify({
             message: userMessage,
             conversation_id: conversationId,
-            prompt_type: promptType
+            prompt_type: promptType,
+            llm_provider: llmProvider
           });
 
           const streamUrl = '/chat';
