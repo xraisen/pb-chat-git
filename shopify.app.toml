@@ -1,13 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "60d2bee24f0b8aa368d185efb3544001"
-<<<<<<< HEAD
-name = "shop-chat-agent"
-handle = "shop-chat-agent"
-=======
 name = "pb-chat-git"
 handle = "pb-chat-git"
->>>>>>> 3be089f818fd2633788e31f35d9322074f98564a
 application_url = "https://pb-chat-git.vercel.app"
 embedded = true
 
