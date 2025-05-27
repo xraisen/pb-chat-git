@@ -424,7 +424,7 @@
             llm_provider: llmProvider
           });
 
-          const streamUrl = `${API_BASE_URL}/chat`;
+          const streamUrl = '/chat';
           const shopId = window.shopId;
 
           const response = await fetch(streamUrl, {
@@ -562,7 +562,7 @@
           messagesContainer.appendChild(loadingMessage);
 
           // Fetch history from the server
-          const historyUrl = `${API_BASE_URL}/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
+          const historyUrl = `/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
           console.log('Fetching history from:', historyUrl);
 
           const response = await fetch(historyUrl, {
@@ -716,7 +716,7 @@
           attemptCount++;
 
           try {
-            const tokenUrl = `${API_BASE_URL}/auth/token-status?conversation_id=` +
+            const tokenUrl = '/auth/token-status?conversation_id=' +
               encodeURIComponent(conversationId);
             const response = await fetch(tokenUrl);
 
