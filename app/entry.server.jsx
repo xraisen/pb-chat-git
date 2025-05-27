@@ -14,6 +14,7 @@ export default async function handleRequest(
   remixContext,
 ) {
   addDocumentResponseHeaders(request, responseHeaders);
+  console.log("CSP Header Set by Shopify library:", responseHeaders.get('Content-Security-Policy'));
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? "") ? "onAllReady" : "onShellReady";
 
