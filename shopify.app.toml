@@ -1,28 +1,31 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "60d2bee24f0b8aa368d185efb3544001"
-name = "pb-chat-git"
-handle = "pb-chat-git"
-application_url = "https://pb-chat-git.vercel.app"
+name = "Planet Beauty AI Chat Agent"
+handle = "pb-ai-chat"
+application_url = "https://strips-dt-thai-uses.trycloudflare.com"
 embedded = true
 
 [build]
 include_config_on_deploy = true
+automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2025-04"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "customer_read_customers,customer_read_orders,customer_read_store_credit_account_transactions,customer_read_store_credit_accounts,unauthenticated_read_product_listings"
+scopes = "customer_read_customers,customer_read_orders,customer_read_store_credit_account_transactions,customer_read_store_credit_accounts,read_products,unauthenticated_read_product_listings,write_products"
 
 [auth]
-redirect_urls = [ "https://pb-chat-git.vercel.app/api/auth" ]
+redirect_urls = [
+  "https://strips-dt-thai-uses.trycloudflare.com/auth/callback",
+  "https://strips-dt-thai-uses.trycloudflare.com/auth/shopify/callback",
+  "https://strips-dt-thai-uses.trycloudflare.com/api/auth/callback"
+]
 
 [pos]
 embedded = false
 
 [mcp.customer_authentication]
-redirect_uris = [
-  "https://pb-chat-git.vercel.app/callback"
-]
+redirect_uris = [ "https://pb-chat-git.vercel.app/callback" ]
