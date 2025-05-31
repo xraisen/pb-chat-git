@@ -6,7 +6,7 @@ import { json } from "@remix-run/node";
 import MCPClient from "../mcp-client";
 import { saveMessage, getConversationHistory, storeCustomerAccountUrl, getCustomerAccountUrl } from "../db.server";
 import AppConfig from "../services/config.server"; // This might be old default config, ensure it's not conflicting
-import { getChatbotConfig } from "~/services/chatbotConfig.server.js"; // Import new config service
+import { getChatbotConfig } from "../services/chatbotConfig.server.js"; // Import new config service
 import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server.js";
 import { createGeminiService } from "../services/gemini.server.js";

@@ -1,8 +1,8 @@
 // app/routes/api.chatbot-public-config.jsx
 import { json } from "@remix-run/node";
 // `unauthenticated` is not used based on the decision to rely on query param.
-// import { unauthenticated } from "~/shopify.server";
-import { getChatbotConfig } from "~/services/chatbotConfig.server.js"; // Adjusted path with ~
+// import { unauthenticated } from "../shopify.server.js";
+import { getChatbotConfig } from "../services/chatbotConfig.server.js";
 
 export async function loader({ request }) {
   const url = new URL(request.url);
