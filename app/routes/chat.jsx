@@ -217,7 +217,7 @@ async function handleChatSession({
     apiKey = shopConfig.apiManagement?.claudeAPIKey;
     if (!apiKey) {
       stream.sendMessage({ type: 'error', error: { message: `Claude API key is not configured for this shop. Please contact support.` }});
-      stream.close();
+      // stream.close(); // createSseStream's finally block will handle this.
       return;
     }
     // Pass model from config if available
@@ -226,7 +226,7 @@ async function handleChatSession({
     apiKey = shopConfig.apiManagement?.geminiAPIKey;
     if (!apiKey) {
       stream.sendMessage({ type: 'error', error: { message: `Gemini API key is not configured for this shop. Please contact support.` }});
-      stream.close();
+      // stream.close(); // createSseStream's finally block will handle this.
       return;
     }
     // Pass model from config if available
