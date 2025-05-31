@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Configuration Dashboard</title>
+    <link rel="stylesheet" href="dashboard_styles.css">
+</head>
+<body>
+    <h1>Chatbot Configuration Dashboard</h1>
+    <form id="chatbotConfigForm">
+
+        <!-- Chatbox Appearance & Design -->
+        <fieldset>
+            <legend>Chatbox Appearance & Design</legend>
+
+            <label for="chatboxBackgroundColor">Chatbox Background Color:</label>
+            <input type="color" id="chatboxBackgroundColor" name="chatboxBackgroundColor">
+
+            <label for="chatboxBorderColor">Chatbox Border Color:</label>
+            <input type="color" id="chatboxBorderColor" name="chatboxBorderColor">
+
+            <label for="chatboxBorderRadius">Chatbox Border Radius (e.g., 10px):</label>
+            <input type="text" id="chatboxBorderRadius" name="chatboxBorderRadius">
+
+            <label for="fontFamily">Font Family:</label>
+            <input type="text" id="fontFamily" name="fontFamily" placeholder="Arial, sans-serif">
+
+            <label for="fontSize">Font Size (e.g., 16px):</label>
+            <input type="text" id="fontSize" name="fontSize">
+
+            <label for="fontWeight">Font Weight:</label>
+            <select id="fontWeight" name="fontWeight">
+                <option value="normal">Normal</option>
+                <option value="bold">Bold</option>
+                <option value="lighter">Lighter</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="300">300</option>
+                <option value="400">400</option>
+                <option value="500">500</option>
+                <option value="600">600</option>
+                <option value="700">700</option>
+                <option value="800">800</option>
+                <option value="900">900</option>
+            </select>
+
+            <label for="chatboxBackgroundOpacity">Chatbox Background Opacity (0-1):</label>
+            <input type="number" id="chatboxBackgroundOpacity" name="chatboxBackgroundOpacity" min="0" max="1" step="0.1">
+
+            <label for="userBubbleColor">User Message Bubble Color:</label>
+            <input type="color" id="userBubbleColor" name="userBubbleColor">
+
+            <label for="botBubbleColor">Bot Message Bubble Color:</label>
+            <input type="color" id="botBubbleColor" name="botBubbleColor">
+
+            <label for="inputFieldBackgroundColor">Input Field Background Color:</label>
+            <input type="color" id="inputFieldBackgroundColor" name="inputFieldBackgroundColor">
+
+            <label for="inputFieldTextColor">Input Field Text Color:</label>
+            <input type="color" id="inputFieldTextColor" name="inputFieldTextColor">
+
+            <label for="sendButtonStyle">Send Button Style:</label>
+            <select id="sendButtonStyle" name="sendButtonStyle">
+                <option value="filled">Filled</option>
+                <option value="outline">Outline</option>
+            </select>
+
+            <label for="sendButtonHoverColor">Send Button Hover Color:</label>
+            <input type="color" id="sendButtonHoverColor" name="sendButtonHoverColor">
+        </fieldset>
+
+        <!-- Custom Branding & Theme -->
+        <fieldset>
+            <legend>Custom Branding & Theme</legend>
+            <label for="customLogoUrl">Custom Logo URL:</label>
+            <input type="text" id="customLogoUrl" name="customLogoUrl" placeholder="https://example.com/logo.png">
+            <!-- Consider <input type="file"> for direct upload later -->
+
+            <label for="customBackgroundUrl">Custom Background URL (for chatbox):</label>
+            <input type="text" id="customBackgroundUrl" name="customBackgroundUrl" placeholder="https://example.com/background.jpg">
+            <!-- Consider <input type="file"> for direct upload later -->
+
+            <label for="brandAccentColor">Brand Accent Color:</label>
+            <input type="color" id="brandAccentColor" name="brandAccentColor">
+        </fieldset>
+
+        <!-- Chatbox Positioning & Behavior -->
+        <fieldset>
+            <legend>Chatbox Positioning & Behavior</legend>
+            <label for="screenPosition">Screen Position:</label>
+            <select id="screenPosition" name="screenPosition">
+                <option value="bottom-right">Bottom Right</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="top-right">Top Right</option>
+                <option value="top-left">Top Left</option>
+            </select>
+
+            <label for="customDesktopPositionX">Custom Desktop Position X (e.g., 20px):</label>
+            <input type="text" id="customDesktopPositionX" name="customDesktopPositionX">
+            <label for="customDesktopPositionY">Custom Desktop Position Y (e.g., 20px):</label>
+            <input type="text" id="customDesktopPositionY" name="customDesktopPositionY">
+
+            <label for="customMobilePositionX">Custom Mobile Position X (e.g., 10px):</label>
+            <input type="text" id="customMobilePositionX" name="customMobilePositionX">
+            <label for="customMobilePositionY">Custom Mobile Position Y (e.g., 10px):</label>
+            <input type="text" id="customMobilePositionY" name="customMobilePositionY">
+
+            <label for="isFixed">Is Fixed Position:</label>
+            <input type="checkbox" id="isFixed" name="isFixed">
+
+            <label for="popupTrigger">Popup Trigger:</label>
+            <select id="popupTrigger" name="popupTrigger">
+                <option value="delay">Delay</option>
+                <option value="userAction">User Action (e.g., click a button)</option>
+                <option value="scroll">Scroll Percentage</option>
+            </select>
+
+            <label for="popupDelaySeconds">Popup Delay (seconds):</label>
+            <input type="number" id="popupDelaySeconds" name="popupDelaySeconds" min="0">
+        </fieldset>
+
+        <!-- Chatbot Behavior & Functionality -->
+        <fieldset>
+            <legend>Chatbot Behavior & Functionality</legend>
+            <label for="chatbotName">Chatbot Name:</label>
+            <input type="text" id="chatbotName" name="chatbotName">
+
+            <label for="defaultGreetingMessage">Default Greeting Message:</label>
+            <textarea id="defaultGreetingMessage" name="defaultGreetingMessage"></textarea>
+
+            <label for="conversationTimeoutSeconds">Conversation Timeout (seconds):</label>
+            <input type="number" id="conversationTimeoutSeconds" name="conversationTimeoutSeconds" min="0">
+
+            <label for="idleMessage">Idle Message:</label>
+            <textarea id="idleMessage" name="idleMessage"></textarea>
+
+            <label for="multiStepDialogs">Multi-Step Dialogs (JSON format):</label>
+            <textarea id="multiStepDialogs" name="multiStepDialogs" rows="5" placeholder='[{"id": "example", "steps": [{"message": "Hello!"}]}]'></textarea>
+
+            <label for="fallbackMessage">Fallback Message:</label>
+            <textarea id="fallbackMessage" name="fallbackMessage"></textarea>
+        </fieldset>
+
+        <!-- Product Display & Shopping Experience -->
+        <fieldset>
+            <legend>Product Display & Shopping Experience</legend>
+            <label for="displayFormat">Product Display Format:</label>
+            <select id="displayFormat" name="displayFormat">
+                <option value="carousel">Carousel</option>
+                <option value="grid">Grid</option>
+                <option value="list">List</option>
+            </select>
+
+            <label for="productImageSize">Product Image Size:</label>
+            <select id="productImageSize" name="productImageSize">
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+            </select>
+
+            <label for="productsPerRow">Products Per Row (for Grid):</label>
+            <input type="number" id="productsPerRow" name="productsPerRow" min="1">
+
+            <label for="showPrice">Show Product Price:</label>
+            <input type="checkbox" id="showPrice" name="showPrice">
+
+            <label for="showName">Show Product Name:</label>
+            <input type="checkbox" id="showName" name="showName">
+
+            <label for="showDescription">Show Product Description:</label>
+            <input type="checkbox" id="showDescription" name="showDescription">
+
+            <label for="defaultSortOrder">Default Product Sort Order:</label>
+            <select id="defaultSortOrder" name="defaultSortOrder">
+                <option value="popularity">Popularity</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="newest">Newest</option>
+            </select>
+
+            <label for="addToCartButtonEnabled">Enable 'Add to Cart' Button:</label>
+            <input type="checkbox" id="addToCartButtonEnabled" name="addToCartButtonEnabled">
+        </fieldset>
+
+        <!-- API Key Management & External Integrations -->
+        <fieldset>
+            <legend>API Key Management & External Integrations</legend>
+            <label for="selectedAPI">Select AI API:</label>
+            <select id="selectedAPI" name="selectedAPI">
+                <option value="Gemini">Gemini</option>
+                <option value="Claude">Claude</option>
+                <option value="OpenAI">OpenAI</option>
+            </select>
+
+            <div>
+                <label for="claudeAPIKey">Claude API Key:</label>
+                <input type="password" id="claudeAPIKey" name="claudeAPIKey" class="apiKeyInput">
+                <span id="claudeAPIKeyStatus" class="apiKeyStatus"></span>
+                <button type="button" id="testClaudeKeyButton" class="testKeyBtn">Test Key</button>
+            </div>
+
+            <div>
+                <label for="geminiAPIKey">Gemini API Key:</label>
+                <input type="password" id="geminiAPIKey" name="geminiAPIKey" class="apiKeyInput">
+                <span id="geminiAPIKeyStatus" class="apiKeyStatus"></span>
+                <button type="button" id="testGeminiKeyButton" class="testKeyBtn">Test Key</button>
+            </div>
+            <!-- Add OpenAI API Key field if needed -->
+
+            <div>
+                <label for="shopifyStoreUrl">Shopify Store URL:</label>
+                <input type="url" id="shopifyStoreUrl" name="shopifyStoreUrl" placeholder="your-store.myshopify.com">
+            </div>
+
+            <div>
+                <label for="shopifyAccessToken">Shopify Access Token (Password):</label>
+                <input type="password" id="shopifyAccessToken" name="shopifyAccessToken">
+            </div>
+        </fieldset>
+
+        <!-- Analytics & Insights Configuration -->
+        <fieldset>
+            <legend>Analytics & Insights Configuration</legend>
+            <label for="trackAddToCart">Track 'Add to Cart' Events:</label>
+            <input type="checkbox" id="trackAddToCart" name="trackAddToCart">
+
+            <label for="trackCheckoutInitiation">Track Checkout Initiation:</label>
+            <input type="checkbox" id="trackCheckoutInitiation" name="trackCheckoutInitiation">
+
+            <label for="trackProductInteractions">Track Product Interactions:</label>
+            <input type="checkbox" id="trackProductInteractions" name="trackProductInteractions">
+
+            <label for="trackCartAbandonment">Track Cart Abandonment:</label>
+            <input type="checkbox" id="trackCartAbandonment" name="trackCartAbandonment">
+
+            <label for="trackConversionRates">Track Conversion Rates:</label>
+            <input type="checkbox" id="trackConversionRates" name="trackConversionRates">
+
+            <label for="trackUserFeedback">Track User Feedback:</label>
+            <input type="checkbox" id="trackUserFeedback" name="trackUserFeedback">
+
+            <label for="analyticsDashboardUrl">Analytics Dashboard URL:</label>
+            <input type="url" id="analyticsDashboardUrl" name="analyticsDashboardUrl" placeholder="https://analytics.example.com">
+        </fieldset>
+
+        <!-- Avatar & Branding Customization -->
+        <fieldset>
+            <legend>Avatar & Branding Customization</legend>
+            <label for="avatarImageUrl">Avatar Image URL:</label>
+            <input type="text" id="avatarImageUrl" name="avatarImageUrl" placeholder="https://example.com/avatar.png">
+            <!-- Consider <input type="file"> for direct upload later -->
+
+            <label for="avatarShape">Avatar Shape:</label>
+            <select id="avatarShape" name="avatarShape">
+                <option value="round">Round</option>
+                <option value="square">Square</option>
+            </select>
+
+            <label for="avatarBorderColor">Avatar Border Color:</label>
+            <input type="color" id="avatarBorderColor" name="avatarBorderColor">
+        </fieldset>
+
+        <!-- User Experience Enhancements -->
+        <fieldset>
+            <legend>User Experience Enhancements</legend>
+            <label for="speechToTextEnabled">Enable Speech-to-Text:</label>
+            <input type="checkbox" id="speechToTextEnabled" name="speechToTextEnabled">
+
+            <label for="textToSpeechEnabled">Enable Text-to-Speech:</label>
+            <input type="checkbox" id="textToSpeechEnabled" name="textToSpeechEnabled">
+
+            <label for="customInteractiveButtons">Custom Interactive Buttons (JSON format):</label>
+            <textarea id="customInteractiveButtons" name="customInteractiveButtons" rows="3" placeholder='[{"text": "Track Order", "action": "dialog:order_status"}]'></textarea>
+
+            <label for="formValidationEnabled">Enable Form Validation:</label>
+            <input type="checkbox" id="formValidationEnabled" name="formValidationEnabled">
+        </fieldset>
+
+        <!-- Security & Privacy Settings -->
+        <fieldset>
+            <legend>Security & Privacy Settings</legend>
+            <label for="endToEndEncryptionEnabled">Enable End-to-End Encryption:</label>
+            <input type="checkbox" id="endToEndEncryptionEnabled" name="endToEndEncryptionEnabled">
+
+            <label for="gdprCompliant">GDPR Compliant:</label>
+            <input type="checkbox" id="gdprCompliant" name="gdprCompliant">
+
+            <label for="sessionTimeoutMinutes">Session Timeout (minutes):</label>
+            <input type="number" id="sessionTimeoutMinutes" name="sessionTimeoutMinutes" min="1">
+
+            <label for="dataRetentionPolicyDays">Data Retention Policy (days):</label>
+            <input type="number" id="dataRetentionPolicyDays" name="dataRetentionPolicyDays" min="0">
+        </fieldset>
+
+        <button type="submit" id="saveSettingsButton">Save Settings</button>
+    </form>
+
+    <script src="config.js"></script>
+    <script src="dashboard_logic.js"></script>
+</body>
+</html>

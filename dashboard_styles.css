@@ -1,0 +1,194 @@
+/* dashboard_styles.css */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+form {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+}
+
+fieldset {
+    border: 1px solid #dcdcdc;
+    border-radius: 5px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+legend {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #3498db;
+    padding: 0 10px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="color"],
+input[type="password"],
+input[type="url"],
+select,
+textarea {
+    width: calc(100% - 22px); /* Account for padding */
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 0.95em;
+    transition: border-color 0.3s ease;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="color"]:focus,
+input[type="password"]:focus,
+input[type="url"]:focus,
+select:focus,
+textarea:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 5px rgba(52,152,219,0.2);
+}
+
+input[type="checkbox"] {
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+button[type="submit"],
+.testKeyBtn {
+    background-color: #3498db;
+    color: white;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+}
+
+button[type="submit"]:hover,
+.testKeyBtn:hover {
+    background-color: #2980b9;
+}
+
+.testKeyBtn {
+    background-color: #5cb85c; /* Green for test buttons */
+    margin-left: 10px;
+    padding: 8px 12px; /* Smaller padding for test buttons */
+    font-size: 0.9em;
+}
+.testKeyBtn:hover {
+    background-color: #4cae4c;
+}
+
+
+/* Styles for API Key validation */
+.apiKeyInput {
+    /* Base style, can be overridden by validation */
+}
+.apiKeyInput.valid {
+    border-color: #2ecc71; /* Green border for valid input */
+}
+.apiKeyInput.invalid {
+    border-color: #e74c3c; /* Red border for potentially invalid (e.g. empty after being filled) */
+}
+
+.apiKeyStatus {
+    font-size: 0.85em;
+    margin-left: 10px;
+    font-weight: 500;
+}
+.apiKeyStatus.valid {
+    color: #2ecc71; /* Green text */
+}
+.apiKeyStatus.invalid {
+    color: #e74c3c; /* Red text */
+}
+.apiKeyStatus.neutral {
+    color: #7f8c8d; /* Grey text for 'Key Entered' or 'No Key' */
+}
+
+/* Ensure items within a div in fieldset are aligned if needed */
+fieldset > div {
+    margin-bottom: 15px; /* Spacing for divs containing label, input, status, button */
+    display: flex;
+    align-items: center; /* Align items vertically */
+    flex-wrap: wrap; /* Allow wrapping if screen is too small */
+}
+
+fieldset > div > label {
+    flex-basis: 200px; /* Fixed base width for labels */
+    margin-right: 10px; /* Space between label and input */
+    margin-bottom: 0; /* Remove bottom margin as div handles spacing */
+}
+
+fieldset > div > input[type="password"],
+fieldset > div > input[type="url"] {
+    flex-grow: 1; /* Allow input to take remaining space */
+    margin-bottom: 0; /* Remove bottom margin as div handles spacing */
+    max-width: calc(100% - 220px - 100px); /* Adjust based on label, span and button width */
+}
+fieldset > div > .apiKeyStatus {
+    flex-basis: 100px; /* Fixed width for status message */
+    text-align: left;
+}
+fieldset > div > .testKeyBtn {
+    /* Button takes its own width */
+}
+
+/* Adjust for smaller screens if necessary */
+@media (max-width: 768px) {
+    fieldset > div {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    fieldset > div > label {
+        flex-basis: auto;
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    fieldset > div > input[type="password"],
+    fieldset > div > input[type="url"] {
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 5px;
+    }
+    fieldset > div > .apiKeyStatus {
+        flex-basis: auto;
+        width: 100%;
+        text-align: left;
+        margin-bottom: 5px;
+    }
+    fieldset > div > .testKeyBtn {
+       margin-left: 0;
+    }
+}
