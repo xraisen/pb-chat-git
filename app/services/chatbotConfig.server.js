@@ -84,16 +84,22 @@ export async function getChatbotConfig(shopId) {
 
   try {
     const configString = await redis.get(redisKey);
+    console.log(`RAW configString from Redis for shop ${shopId} (${redisKey}): [${configString}]`); // <-- ADDED THIS LINE
     if (configString) {
-      const savedConfig = JSON.parse(configString);
-      mergedConfig = deepMerge(mergedConfig, savedConfig);
-      console.log(`Configuration loaded from Redis for shop ${shopId}.`);
+      try { // Added try-catch for JSON.parse
+        const savedConfig = JSON.parse(configString);
+        mergedConfig = deepMerge(mergedConfig, savedConfig);
+      } catch (parseError) {
+        console.error(`Error parsing configString for shop ${shopId} from Redis:`, parseError, `Raw string: [${configString}]`);
+        // mergedConfig remains as defaults if parsing fails
+      }
+      console.log(`Configuration loaded from Redis for shop ${shopId} (or defaults if parsing failed).`);
     } else {
       console.log(`No configuration found in Redis for shop ${shopId}. Using defaults.`);
     }
-  } catch (error) {
-    console.error(`Error fetching or parsing config for shop ${shopId} from Redis:`, error);
-    // In case of error, mergedConfig still holds the deep copy of defaults
+  } catch (error) { // Catch errors from redis.get itself
+    console.error(`Error fetching config for shop ${shopId} from Redis (redis.get failed):`, error);
+    // In case of redis.get error, mergedConfig still holds the deep copy of defaults
   }
   return mergedConfig;
 }

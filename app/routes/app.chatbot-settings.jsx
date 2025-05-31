@@ -8,7 +8,7 @@ import {
 import { authenticate } from "../shopify.server";
 import { getChatbotConfig, saveChatbotConfig } from "../services/chatbotConfig.server.js";
 import { defaultChatbotConfig } from "../services/chatbotConfig.defaults.js";
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 export async function loader({ request }) {
   const { session } = await authenticate.admin(request);

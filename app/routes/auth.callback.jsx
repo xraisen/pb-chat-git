@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import { getCodeVerifier, storeCustomerToken } from "../db.server";
+import { getCodeVerifier, storeCustomerToken, getCustomerAccountUrl } from "../db.server.js";
 
 /**
  * Handle OAuth callback from Shopify Customer API
@@ -164,7 +164,6 @@ async function exchangeCodeForToken(code, state) {
  * @returns {Promise<string|null>} - The token URL or null if not found
  */
 async function getTokenUrl(shopId, conversationId) {
-  const { getCustomerAccountUrl } = await import('../db.server');
   const customerAccountUrl = await getCustomerAccountUrl(conversationId);
   if (!customerAccountUrl) {
     console.error('Customer account URL not found for conversation:', conversationId);
