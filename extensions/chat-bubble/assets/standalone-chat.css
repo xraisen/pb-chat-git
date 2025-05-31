@@ -1,0 +1,198 @@
+body {
+    font-family: Arial, sans-serif; /* Will be configurable */
+    margin: 0;
+    padding: 20px; /* For viewing the chatbot easily during development */
+    background-color: #e0e0e0; /* Page background, just for contrast */
+}
+
+#chatbotContainer {
+    width: 360px; /* Will be configurable */
+    max-height: 80vh; /* Max height relative to viewport height */
+    min-height: 200px; /* Minimum height */
+    background-color: #ffffff; /* Will be configurable */
+    border: 1px solid #cccccc; /* Will be configurable */
+    border-radius: 10px; /* Will be configurable */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Default positioning, will be configurable */
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+#chatbotHeader {
+    background-color: #007bff; /* Will be configurable (brandAccentColor) */
+    color: white; /* Will be configurable */
+    padding: 12px 15px;
+    font-size: 1.1em; /* Will be configurable */
+    font-weight: bold; /* Will be configurable */
+    display: flex;
+    align-items: center;
+    border-top-left-radius: 10px; /* Match container */
+    border-top-right-radius: 10px; /* Match container */
+}
+
+#chatbotTitle {
+    /* Styling for title is mainly inherited from #chatbotHeader */
+    flex-grow: 1; /* Allow title to take available space */
+}
+
+#chatbotAvatarImg {
+    width: 35px; /* Will be configurable (part of avatar settings) */
+    height: 35px; /* Will be configurable */
+    border-radius: 50%; /* Default to round, will be configurable */
+    margin-right: 12px;
+    border: 2px solid white; /* Will be configurable (avatarBorderColor) */
+    object-fit: cover; /* Ensure image covers the area well */
+}
+
+#chatboxMessages {
+    flex-grow: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #f9f9f9; /* Will be configurable (chatboxBackgroundColor related) */
+    display: flex;
+    flex-direction: column; /* Stack messages vertically */
+}
+
+.message {
+    margin-bottom: 12px;
+    padding: 10px 15px;
+    border-radius: 18px; /* Will be configurable */
+    max-width: 85%;
+    line-height: 1.45;
+    word-wrap: break-word; /* Prevent long words from overflowing */
+}
+
+.bot-message {
+    background-color: #e9ecef; /* Will be configurable (botBubbleColor) */
+    color: #333; /* Will be configurable */
+    align-self: flex-start;
+    border-bottom-left-radius: 4px; /* Will be configurable */
+}
+
+.user-message {
+    background-color: #007bff; /* Will be configurable (userBubbleColor) */
+    color: white; /* Will be configurable */
+    align-self: flex-end;
+    margin-left: auto; /* Push to the right */
+    border-bottom-right-radius: 4px; /* Will be configurable */
+}
+
+/* Typing indicator styles */
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 5px 0px; /* Reduced padding for a more compact look */
+    margin-left: 5px; /* Align with message bubble */
+}
+
+.typing-indicator span {
+    height: 8px;
+    width: 8px;
+    background-color: #aaa; /* Will be configurable (related to botBubbleColor or a new setting) */
+    border-radius: 50%;
+    display: inline-block;
+    margin: 0 2px;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+/* .typing-indicator span:nth-child(3) { animation-delay: 0s; } */ /* Not needed if only 2 dots */
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1.0); }
+}
+
+
+#chatbotInputArea {
+    display: flex;
+    align-items: center; /* Vertically align items */
+    padding: 12px;
+    border-top: 1px solid #dddddd; /* Will be configurable */
+    background-color: #ffffff; /* Will be configurable (inputFieldBackgroundColor) */
+}
+
+#userInputField {
+    flex-grow: 1;
+    padding: 12px 15px;
+    border: 1px solid #ced4da; /* Will be configurable */
+    border-radius: 22px; /* Will be configurable */
+    margin-right: 10px;
+    font-size: 1em; /* Will be configurable */
+    color: #333; /* Will be configurable (inputFieldTextColor) */
+    background-color: #f8f9fa; /* Slightly different from area background, configurable */
+}
+
+#userInputField:focus {
+    outline: none;
+    border-color: #80bdff; /* Will be configurable (brandAccentColor related) */
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); /* Will be configurable */
+}
+
+#sendMessageButton {
+    padding: 12px 18px;
+    background-color: #007bff; /* Will be configurable (sendButtonStyle, brandAccentColor) */
+    color: white; /* Will be configurable */
+    border: none;
+    border-radius: 22px; /* Will be configurable */
+    cursor: pointer;
+    font-size: 1em; /* Will be configurable */
+    font-weight: 500; /* Will be configurable */
+    transition: background-color 0.2s ease;
+}
+
+#sendMessageButton:hover {
+    background-color: #0056b3; /* Will be configurable (sendButtonHoverColor) */
+}
+
+/* Styles for quick replies container */
+#quickRepliesContainer {
+    padding: 5px 10px 0px 10px; /* Padding around the quick replies area */
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap to the next line */
+    gap: 8px; /* Space between quick reply buttons */
+    justify-content: flex-start; /* Align buttons to the start (left) */
+    border-top: 1px solid #efefef; /* Optional: separator line */
+    background-color: #ffffff; /* Match input area background */
+}
+
+.quick-reply-button {
+    padding: 8px 15px;
+    border: 1px solid #007bff; /* Will be configurable (brandAccentColor) */
+    background-color: #f8f9fa; /* Light background, configurable */
+    color: #007bff; /* Text color matches border, configurable */
+    border-radius: 20px; /* Rounded corners, configurable */
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.quick-reply-button:hover {
+    background-color: #007bff; /* Will be configurable (brandAccentColor / sendButtonHoverColor) */
+    color: white; /* Text color on hover, configurable */
+}
+
+/* Hide scrollbar for webkit browsers */
+#chatboxMessages::-webkit-scrollbar {
+    width: 6px;
+}
+
+#chatboxMessages::-webkit-scrollbar-track {
+    background: #f1f1f1; /* Will be configurable */
+    border-radius: 10px;
+}
+
+#chatboxMessages::-webkit-scrollbar-thumb {
+    background: #888; /* Will be configurable */
+    border-radius: 10px;
+}
+
+#chatboxMessages::-webkit-scrollbar-thumb:hover {
+    background: #555; /* Will be configurable */
+}

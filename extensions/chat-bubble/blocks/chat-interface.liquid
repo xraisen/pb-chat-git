@@ -1,95 +1,61 @@
-{{ 'chat.css' | asset_url | stylesheet_tag }}
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+{{ 'standalone-chat.css' | asset_url | stylesheet_tag }}
 
-<div class="shop-ai-chat-container">
-  <div class="shop-ai-chat-bubble" style="background-color: {{ block.settings.chat_bubble_color }}">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-  </div>
-
-  <div class="shop-ai-chat-window">
-    <div class="shop-ai-chat-header">
-      <div>{{ 'chat.title' | t }}</div>
-      <button class="shop-ai-chat-close">✕</button>
-    </div>
-
-    <div class="shop-ai-chat-messages">
-      <!-- Messages will be added here by JavaScript -->
-    </div>
-
-    <div class="shop-ai-chat-input">
-      <input type="text" placeholder="{{ 'chat.inputPlaceholder' | t }}">
-      <button class="shop-ai-chat-send">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
-    </div>
-  </div>
+<div id="shop-ai-chatbot-root-container">
+  {# This div will be the entry point for your standalone-chat-logic.js to build the UI #}
+  {# The UI defined in the old chatbot.html will be constructed here by standalone-chat-logic.js #}
 </div>
 
-<script src="{{ 'chat.js' | asset_url }}" defer></script>
+{# Pass essential Shopify data to the standalone chatbot scripts #}
 <script>
-  window.shopChatConfig = {
-    promptType: {{ block.settings.system_prompt | json }},
-    welcomeMessage: {{ block.settings.welcome_message | json }},
-    llmProvider: {{ block.settings.llm_provider | json }}
-  };
-  window.shopId = {{ shop.id }};
-     window.shopAiApiBaseUrl = {{ app.url | json }};
+  // Ensure this data is properly escaped and handled if it can contain user-input or special characters.
+  // For simple IDs and URLs, JSON stringify is a good measure.
+  window.shopifyShopId = {{ shop.permanent_domain | json }}; // Using permanent_domain as a stable shop identifier
+  window.shopifyShopName = {{ shop.name | json }};
+  window.shopifyAppUrl = {{ app.url | json }}; // Your Remix app's base URL, useful for API calls to your backend
+  window.initialChatBubbleColor = {{ block.settings.chat_bubble_color | json }}; // Example setting from schema
+
+  // Potentially, customer data if available and consented:
+  // {% if customer %}
+  //   window.shopifyCustomer = {
+  //     id: {{ customer.id | json }},
+  //     email: {{ customer.email | json }},
+  //     firstName: {{ customer.first_name | json }},
+  //     lastName: {{ customer.last_name | json }}
+  //   };
+  // {% else %}
+  //   window.shopifyCustomer = null;
+  // {% endif %}
 </script>
+
+{# Load the default config first, then the api_handler, then the main logic script #}
+{# These scripts will use the window.shopifyShopId and other variables set above #}
+<script src="{{ 'config.js' | asset_url }}" defer></script>
+<script src="{{ 'api_handler.js' | asset_url }}" defer></script>
+<script src="{{ 'standalone-chat-logic.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
-  "name": "AI Chat Assistant",
+  "name": "AI Chat Assistant Loader",
   "target": "body",
   "settings": [
     {
+      "type": "text",
+      "id": "placeholder_setting",
+      "label": "Placeholder Setting",
+      "default": "This is a placeholder. Configure in app.",
+      "info": "Most chatbot settings are now managed in the app admin dashboard."
+    },
+    {
       "type": "color",
       "id": "chat_bubble_color",
-      "label": "Chat Bubble Color",
-      "default": "#5046e4"
-    },
-    {
-      "type": "text",
-      "id": "welcome_message",
-      "label": "Welcome Message",
-      "default": "👋 Hi there! How can I help you today?"
-    },
-    {
-      "type": "select",
-      "id": "system_prompt",
-      "label": "System Prompt",
-      "options": [
-        {
-          "value": "standardAssistant",
-          "label": "Standard Assistant"
-        },
-        {
-          "value": "enthusiasticAssistant",
-          "label": "Enthusiastic Assistant"
-        }
-      ],
-      "default": "standardAssistant"
-    },
-    {
-      "type": "select",
-      "id": "llm_provider",
-      "label": "LLM Provider",
-      "options": [
-        {
-          "value": "claude",
-          "label": "Claude"
-        },
-        {
-          "value": "gemini",
-          "label": "Gemini"
-        }
-      ],
-      "default": "gemini"
+      "label": "Chat Bubble Accent Color",
+      "info": "This color might be used by the chat bubble design if it's part of an app block. For the full chat window, settings are loaded from the app.",
+      "default": "#E57399"
     }
-  ]
+    // This schema is kept minimal as the full configuration is fetched from the app's backend (via Redis).
+    // It's mainly for the app block's context in the theme editor if needed, or for very basic initial values.
+  ],
+  "javascript_asset_url": "{{ 'standalone-chat-loader.js' | asset_url }}", // Optional: if you need a tiny loader script for this block specifically
+  "stylesheet_asset_url": "{{ 'standalone-chat-block-styles.css' | asset_url }}" // Optional: if you have styles specific to this block wrapper
 }
 {% endschema %}
