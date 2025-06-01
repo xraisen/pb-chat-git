@@ -160,6 +160,19 @@ model PromotionalMessage {
   @@index([shop, isActive])
 }
 
+model MessageFeedback {
+  id             String   @id @default(cuid())
+  shop           String
+  conversationId String
+  messageContent String   @db.Text // Store a snippet or hash of the message for context
+  rating         String   // "UP" or "DOWN"
+  comment        String?  @db.Text // Optional textual feedback
+  timestamp      DateTime @default(now())
+
+  @@index([shop, timestamp])
+  @@index([conversationId])
+}
+
 model PromotionalProduct {
   id             String   @id @default(cuid())
   shop           String

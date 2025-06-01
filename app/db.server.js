@@ -481,6 +481,87 @@ export async function deletePromotionalProduct(id, shop) {
   }
 }
 
+// MessageFeedback Functions
+export async function createMessageFeedback(shop, data) {
+  try {
+    const { conversationId, messageContent, rating, comment } = data;
+    if (!shop || !conversationId || !messageContent || !rating) {
+      throw new Error("Shop, conversationId, messageContent, and rating are required for message feedback.");
+    }
+    if (rating !== "UP" && rating !== "DOWN") {
+      throw new Error("Invalid rating value. Must be 'UP' or 'DOWN'.");
+    }
+    return await prisma.messageFeedback.create({
+      data: {
+        shop,
+        conversationId,
+        messageContent,
+        rating,
+        comment: comment || null,
+      },
+    });
+  } catch (error) {
+    console.error(`Error creating message feedback for shop ${shop}:`, error);
+    throw error;
+  }
+}
+
+export async function getMessageFeedbackStats(shop) {
+  if (!shop) {
+    console.warn("getMessageFeedbackStats: shop parameter is required, returning default stats.");
+    return { upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0, error: "Shop parameter required." };
+  }
+  try {
+    const upvotes = await prisma.messageFeedback.count({
+      where: { shop, rating: "UP" },
+    });
+    const downvotes = await prisma.messageFeedback.count({
+      where: { shop, rating: "DOWN" },
+    });
+    const totalFeedback = upvotes + downvotes;
+    const positiveFeedbackPercentage = totalFeedback > 0 ? (upvotes / totalFeedback) * 100 : 0;
+
+    return {
+      upvotes,
+      downvotes,
+      totalFeedback,
+      positiveFeedbackPercentage: parseFloat(positiveFeedbackPercentage.toFixed(1)),
+    };
+  } catch (error) {
+    console.error(`Error fetching message feedback stats for shop ${shop}:`, error);
+    return { upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0, error: "Failed to load feedback stats." };
+  }
+}
+
+export async function getRecentMessageFeedback(shop, limit = 10) {
+  if (!shop) {
+    console.warn("getRecentMessageFeedback: shop parameter is required, returning empty array.");
+    return [];
+  }
+  try {
+    return await prisma.messageFeedback.findMany({
+      where: {
+        shop,
+        comment: { not: null },
+      },
+      orderBy: { timestamp: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        timestamp: true,
+        rating: true,
+        comment: true,
+        messageContent: true,
+        conversationId: true,
+      }
+    });
+  } catch (error) {
+    console.error(`Error fetching recent message feedback for shop ${shop}:`, error);
+    return [];
+  }
+}
+
+
 /**
  * Store a code verifier for PKCE authentication
  * @param {string} state - The state parameter used in OAuth flow

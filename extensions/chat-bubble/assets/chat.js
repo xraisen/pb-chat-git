@@ -4,13 +4,46 @@
 (function() {
   'use strict';
 
+  // SVG Icons for Feedback
+  const THUMBS_UP_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"></path></svg>';
+  const THUMBS_DOWN_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14-.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79-.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"></path></svg>';
+  // Optional: Filled versions for selected state - can be done with CSS fill property too
+  // const THUMBS_UP_FILLED_SVG = '<svg ... filled path ... </svg>';
+  // const THUMBS_DOWN_FILLED_SVG = '<svg ... filled path ... </svg>';
+
+
+  function handleFeedbackClick(messageElement, rating, feedbackContainer) {
+    feedbackContainer.querySelectorAll('.shop-ai-feedback-btn').forEach(btn => {
+      btn.disabled = true;
+      btn.style.cursor = 'default';
+      if ((rating === 'UP' && btn.classList.contains('thumbs-up')) || (rating === 'DOWN' && btn.classList.contains('thumbs-down'))) {
+        btn.classList.add('selected'); // For CSS to style fill: var(--chatbot-button-color); for example
+      } else {
+        btn.style.opacity = '0.3';
+      }
+    });
+
+    const messageIdForFeedback = messageElement.id || `msg_dom_${Date.now()}`;
+    const messageContent = messageElement.dataset.rawText || "";
+
+    ShopAIChat.Feedback.send(messageIdForFeedback, messageContent, rating);
+
+    // Optional: Show thank you message or comment box
+    const thankYouMsg = document.createElement('span');
+    thankYouMsg.textContent = 'Thanks for your feedback!';
+    thankYouMsg.className = 'shop-ai-feedback-thanks';
+    feedbackContainer.innerHTML = ''; // Clear buttons
+    feedbackContainer.appendChild(thankYouMsg);
+  }
+
+
   const ShopAIChat = {
     State: {
       conversationId: null,
       isChatOpenedEver: false,
     },
 
-    Log: {
+    Log: { /* ... existing Log module ... */
       sendInteraction: async function(eventType, eventDetail = {}) {
         const config = window.shopChatConfig || {};
         const shopDomain = config.shopDomain || (window.Shopify && window.Shopify.shop);
@@ -48,7 +81,57 @@
       }
     },
 
-    Promotions: {
+    Feedback: {
+      send: async function(messageId, messageContent, rating, comment = null) {
+        const conversationId = ShopAIChat.State.conversationId;
+        if (!conversationId) {
+          console.warn("Feedback: Conversation ID not found for feedback on message:", messageId);
+          // Do not send feedback if conversation ID is missing, as it's crucial for context.
+          return;
+        }
+
+        const config = window.shopChatConfig || {};
+        const shopDomain = config.shopDomain || (window.Shopify && window.Shopify.shop);
+
+        if (!shopDomain) {
+          console.warn("Feedback: Shop domain not configured. Cannot send feedback.");
+          return;
+        }
+        // window.shopChatConfig.shopDomain = shopDomain; // Not needed to set it back here
+
+        const feedbackData = {
+          shop: shopDomain,
+          conversationId: conversationId,
+          // messageId: messageId, // Current DB model does not have messageId, uses messageContent
+          messageContent: messageContent.substring(0, 1000), // Send a snippet, ensure max length
+          rating: rating, // "UP" or "DOWN"
+          comment: comment
+        };
+
+        try {
+          const baseUrl = window.shopAiApiBaseUrl || '';
+          const response = await fetch(`${baseUrl}/api/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(feedbackData)
+          });
+          if (!response.ok) {
+            console.error('Feedback API Error:', response.status, await response.text());
+          } else {
+            // console.log('Feedback sent successfully for message:', messageId);
+            ShopAIChat.Log.sendInteraction('MESSAGE_FEEDBACK_SENT', {
+              rating,
+              messageDomId: messageId, // Log the DOM ID for client-side reference if needed
+              messageSnippet: feedbackData.messageContent.substring(0,50) + "..."
+            });
+          }
+        } catch (error) {
+          console.error('Feedback: Failed to send feedback for message ' + messageId + ':', error);
+        }
+      }
+    },
+
+    Promotions: { /* ... existing Promotions module ... */
       init: function() {
         const config = window.shopChatConfig || {};
         if (!ShopAIChat.UI.elements.messagesContainer) {
@@ -75,7 +158,7 @@
             if (!isNaN(timeDelay) && timeDelay > 0 && !sessionStorage.getItem(`promo_timer_set_${uniqueId}`)) {
               setTimeout(() => {
                 if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
-                  ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+                  ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer, 'promotional');
                   ShopAIChat.Log.sendInteraction("PROMOTIONAL_MESSAGE_DISPLAYED", { messageId: promoMsg.id, trigger: promoMsg.triggerType, autoPopup: true });
                   sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
                 }
@@ -84,7 +167,7 @@
             }
           } else if (this.checkTrigger(promoMsg.triggerType, promoMsg.triggerValue, uniqueId)) {
             if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
-              ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+              ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer, 'promotional');
               ShopAIChat.Log.sendInteraction("PROMOTIONAL_MESSAGE_DISPLAYED", { messageId: promoMsg.id, trigger: promoMsg.triggerType });
               sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
             }
@@ -99,7 +182,7 @@
             if (!isNaN(timeDelay) && timeDelay > 0 && !sessionStorage.getItem(`promo_timer_set_${uniqueId}`)) {
               setTimeout(() => {
                 if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
-                  ShopAIChat.Message.add(`Check out this special offer: ${promoProd.productId}`, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+                  ShopAIChat.Message.add(`Check out this special offer: ${promoProd.productId}`, 'assistant', ShopAIChat.UI.elements.messagesContainer, 'promotional_product');
                   ShopAIChat.Log.sendInteraction("PROMOTIONAL_PRODUCT_DISPLAYED", { promotionalProductId: promoProd.id, productId: promoProd.productId, trigger: promoProd.triggerType, autoPopup: true });
                   sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
                 }
@@ -108,7 +191,7 @@
             }
           } else if (this.checkTrigger(promoProd.triggerType, promoProd.triggerValue, uniqueId)) {
             if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
-              ShopAIChat.Message.add(`Check out this special offer: ${promoProd.productId}`, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+              ShopAIChat.Message.add(`Check out this special offer: ${promoProd.productId}`, 'assistant', ShopAIChat.UI.elements.messagesContainer, 'promotional_product');
               ShopAIChat.Log.sendInteraction("PROMOTIONAL_PRODUCT_DISPLAYED", { promotionalProductId: promoProd.id, productId: promoProd.productId, trigger: promoProd.triggerType });
               sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
             }
@@ -149,7 +232,7 @@
               if (!promoMsg || !promoMsg.id) return;
               const uniqueId = `promo_msg_${promoMsg.id}`;
               if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
-                ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+                ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer, 'promotional');
                 ShopAIChat.Log.sendInteraction("PROMOTIONAL_MESSAGE_DISPLAYED", { messageId: promoMsg.id, trigger: promoMsg.triggerType, autoPopup: true });
                 sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
               }
@@ -157,9 +240,9 @@
           }
         });
       }
-    }, // End ShopAIChat.Promotions
+    },
 
-    UI: { // ... (Existing UI object content from step 35, no changes here) ...
+    UI: { /* ... existing UI methods ... */
       elements: {},
       isMobile: false,
 
@@ -302,14 +385,14 @@
         });
       },
 
-      setupMobileViewport: function() { /* ... unchanged ... */
+      setupMobileViewport: function() {
         const setViewportHeight = () => {
           document.documentElement.style.setProperty('--viewport-height', `${window.innerHeight}px`);
         };
         window.addEventListener('resize', setViewportHeight);
         setViewportHeight();
       },
-      toggleChatWindow: function() { /* ... (logic from step 35 including CHAT_OPENED log) ... */
+      toggleChatWindow: function() {
         const { chatWindow, chatInput } = this.elements;
         const becomingActive = !chatWindow.classList.contains('active');
 
@@ -331,7 +414,7 @@
           document.body.classList.remove('shop-ai-chat-open');
         }
       },
-      closeChatWindow: function() { /* ... unchanged ... */
+      closeChatWindow: function() {
         const { chatWindow, chatInput } = this.elements;
         chatWindow.classList.remove('active');
         if (this.isMobile) {
@@ -339,13 +422,13 @@
           document.body.classList.remove('shop-ai-chat-open');
         }
       },
-      scrollToBottom: function() { /* ... unchanged ... */
+      scrollToBottom: function() {
         const { messagesContainer } = this.elements;
         setTimeout(() => {
           if(messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 100);
       },
-      showTypingIndicator: function() { /* ... unchanged ... */
+      showTypingIndicator: function() {
         const { messagesContainer } = this.elements;
         if(!messagesContainer) return;
         const typingIndicator = document.createElement('div');
@@ -354,7 +437,7 @@
         messagesContainer.appendChild(typingIndicator);
         this.scrollToBottom();
       },
-      removeTypingIndicator: function() { /* ... unchanged ... */
+      removeTypingIndicator: function() {
         const { messagesContainer } = this.elements;
         if(!messagesContainer) return;
         const typingIndicator = messagesContainer.querySelector('.shop-ai-typing-indicator');
@@ -362,7 +445,7 @@
           typingIndicator.remove();
         }
       },
-      displayProductResults: function(products) { /* ... (logic from step 31) ... */
+      displayProductResults: function(products) {
         const config = window.shopChatConfig || {};
         const displayMode = config.productDisplayMode || 'card';
         const maxProducts = parseInt(config.maxProductsToDisplay, 10) || 3;
@@ -418,7 +501,7 @@
       }
     },
 
-    Message: { /* ... (logic from step 35, including USER_MESSAGE_SENT log) ... */
+    Message: {
       send: async function(chatInput, messagesContainer) {
         const userMessage = chatInput.value.trim();
         this.add(userMessage, 'user', messagesContainer);
@@ -433,37 +516,66 @@
           this.add("Sorry, I couldn't process your request. Please try again later.", 'assistant', messagesContainer);
         }
       },
-      add: function(text, sender, messagesContainer) {
+      add: function(text, sender, messagesContainer, messageType = null) { // Added messageType
         if(!messagesContainer) {
           console.error("Messages container not found for adding message:", text);
           return null;
         }
         const messageElement = document.createElement('div');
+        // Assign a unique ID to each message element for feedback targeting
+        messageElement.id = `msg_dom_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         messageElement.classList.add('shop-ai-message', sender);
-        // If 'text' is an object (for structured promotional messages), use its content property
+
+        let messageContent = text;
         if (typeof text === 'object' && text !== null && text.content) {
-            messageElement.dataset.rawText = text.content;
+            messageContent = text.content; // Use content if 'text' is an object
             if (text.type === 'promotional' || text.type === 'promotional_product') {
                 messageElement.classList.add('shop-ai-message-promotional');
+                messageType = text.type; // Override messageType if provided in object
             }
-        } else {
-             messageElement.dataset.rawText = text;
         }
+        messageElement.dataset.rawText = messageContent;
 
         if (sender === 'assistant') {
           ShopAIChat.Formatting.formatMessageContent(messageElement);
         } else {
-          // For user messages, or if assistant message is not pre-formatted by markdown
-          if (messageElement.innerHTML === "") { // only set textContent if innerHTML wasn't set by formatMessageContent
-             messageElement.textContent = messageElement.dataset.rawText;
+          if (messageElement.innerHTML === "") {
+             messageElement.textContent = messageContent;
           }
         }
         messagesContainer.appendChild(messageElement);
+
+        // Add feedback buttons for non-promotional assistant messages
+        if (sender === 'assistant' && messageType !== 'promotional' && messageType !== 'promotional_product') {
+            const feedbackContainer = document.createElement('div');
+            feedbackContainer.className = 'shop-ai-feedback-container';
+
+            const thumbsUpBtn = document.createElement('button');
+            thumbsUpBtn.className = 'shop-ai-feedback-btn thumbs-up';
+            thumbsUpBtn.innerHTML = THUMBS_UP_SVG;
+            thumbsUpBtn.setAttribute('aria-label', 'Thumbs up');
+            thumbsUpBtn.onclick = () => handleFeedbackClick(messageElement, rating, feedbackContainer);
+
+
+            const thumbsDownBtn = document.createElement('button');
+            thumbsDownBtn.className = 'shop-ai-feedback-btn thumbs-down';
+            thumbsDownBtn.innerHTML = THUMBS_DOWN_SVG;
+            thumbsDownBtn.setAttribute('aria-label', 'Thumbs down');
+
+            // Pass messageElement (for ID), messageContent (raw text), rating, and feedbackContainer
+            thumbsUpBtn.onclick = () => handleFeedbackClick(messageElement, 'UP', feedbackContainer);
+            thumbsDownBtn.onclick = () => handleFeedbackClick(messageElement, 'DOWN', feedbackContainer);
+
+            feedbackContainer.appendChild(thumbsUpBtn);
+            feedbackContainer.appendChild(thumbsDownBtn);
+            messageElement.appendChild(feedbackContainer);
+        }
+
         ShopAIChat.UI.scrollToBottom();
         return messageElement;
       }
     },
-    Formatting: { /* ... (Existing Formatting object content from step 35, no changes here) ... */
+    Formatting: { /* ... unchanged ... */
       formatMessageContent: function(element) {
         if (!element || !element.dataset.rawText) return;
         const rawText = element.dataset.rawText;
@@ -538,7 +650,7 @@
         return htmlContent;
       }
     },
-    API: { /* ... (Existing API object content from step 35, including State.conversationId updates) ... */
+    API: { /* ... unchanged ... */
       streamResponse: async function(userMessage, conversationId, messagesContainer) {
         let currentMessageElement = null;
         try {
@@ -696,7 +808,7 @@
         }
       }
     },
-    Auth: { /* ... (Existing Auth object content from step 35, no changes here) ... */
+    Auth: { /* ... unchanged ... */
       openAuthPopup: function(authUrlOrElement) {
         let authUrl;
         if (typeof authUrlOrElement === 'string') {
@@ -754,7 +866,7 @@
         setTimeout(poll, 2000);
       }
     },
-    Product: { /* ... (Existing Product object content from step 35, including ADD_TO_CART_FROM_CHAT_PRODUCT log) ... */
+    Product: { /* ... unchanged ... */
       createCard: function(product) {
         const card = document.createElement('div');
         card.classList.add('shop-ai-product-card');
@@ -807,7 +919,7 @@
       }
     },
 
-    init: function() {
+    init: function() { /* ... unchanged from step 37 ... */
       const container = document.querySelector('.shop-ai-chat-container');
       if (!container) {
           console.error("Shop AI Chat: Container not found. Cannot initialize.");
