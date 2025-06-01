@@ -217,26 +217,58 @@
         }
       },
       displayProductResults: function(products) {
+        const config = window.shopChatConfig || {};
+        const displayMode = config.productDisplayMode || 'card';
+        const maxProducts = parseInt(config.maxProductsToDisplay, 10) || 3;
+        const itemWidth = config.carouselItemWidth || '180px';
+
+        const limitedProducts = products.slice(0, maxProducts);
+
         const { messagesContainer } = this.elements;
-        const productSection = document.createElement('div');
+
+        // Check if a product section already exists, if so, remove it to refresh
+        let productSection = messagesContainer.querySelector('.shop-ai-product-section');
+        if (productSection) {
+            productSection.remove();
+        }
+
+        productSection = document.createElement('div');
         productSection.classList.add('shop-ai-product-section');
         messagesContainer.appendChild(productSection);
+
         const header = document.createElement('div');
         header.classList.add('shop-ai-product-header');
-        header.innerHTML = '<h4>Top Matching Products</h4>';
+        header.innerHTML = '<h4>Top Matching Products</h4>'; // Consider making this configurable
         productSection.appendChild(header);
+
         const productsContainer = document.createElement('div');
-        productsContainer.classList.add('shop-ai-product-grid');
+        // Clear existing classes and add the base class
+        productsContainer.className = 'shop-ai-product-grid';
+
+        if (displayMode === 'carousel') {
+          productsContainer.classList.add('product-grid-carousel');
+        } else if (displayMode === 'combo') {
+          // For 'combo', we'll use 'product-grid-card' for JS logic, CSS can differ
+          productsContainer.classList.add('product-grid-card');
+          // Or add 'product-grid-combo' if specific JS logic for combo is needed later
+        } else { // 'card' or default
+          productsContainer.classList.add('product-grid-card');
+        }
         productSection.appendChild(productsContainer);
-        if (!products || !Array.isArray(products) || products.length === 0) {
+
+        if (!limitedProducts || limitedProducts.length === 0) {
           const noProductsMessage = document.createElement('p');
           noProductsMessage.textContent = "No products found";
           noProductsMessage.style.padding = "10px";
           productsContainer.appendChild(noProductsMessage);
         } else {
-          products.forEach(product => {
-            const productCard = ShopAIChat.Product.createCard(product);
-            productsContainer.appendChild(productCard);
+          limitedProducts.forEach(product => {
+            const productCardElement = ShopAIChat.Product.createCard(product);
+            if (displayMode === 'carousel') {
+              productCardElement.style.width = itemWidth;
+              productCardElement.style.flexShrink = '0'; // Important for flex items in a scrollable container
+            }
+            productsContainer.appendChild(productCardElement);
           });
         }
         this.scrollToBottom();
