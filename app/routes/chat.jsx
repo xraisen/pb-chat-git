@@ -246,12 +246,7 @@ async function handleChatSession({
     // for SSE events like 'chunk', 'id', 'message_complete', 'error', 'end_turn'.
     // It does not use onText, onMessage, onToolUse callbacks in the same way Claude SDK did.
     
-    // We need to collect the full assistant message to save it.
-    let assistantResponseText = "";
-    const originalSendMessage = stream.sendMessage;
-
-    // Wrap sendMessage to intercept chunks and build the full response
-    // and to handle message saving.
+    // Wrap sendMessage to intercept chunks, build the full response, and handle message saving.
     let assistantResponseText = "";
     const originalSendMessage = stream.sendMessage;
     let geminiToolCallEventData = null; // To store data from gemini_tool_call event
