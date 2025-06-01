@@ -379,3 +379,5 @@ function getFormValue(elementId) {
     // console.warn(`Element with ID ${elementId} not found when trying to get value.`);
     return null; // Or undefined, or throw an error, depending on desired strictness
 }
+
+[end of dashboard_logic.js]

@@ -12,6 +12,7 @@ import { createClaudeService } from "../services/claude.server.js";
 import { createGeminiService } from "../services/gemini.server.js";
 import { createToolService } from "../services/tool.server";
 import { unauthenticated } from "../shopify.server";
+import promptsFromFile from "../../prompts/prompts.json";
 
 
 /**
@@ -145,9 +146,23 @@ async function handleChatRequest(request) {
     }
 
     // Use configured or default values
-    const promptType = body.prompt_type || shopConfig.functionality?.systemPrompt || AppConfig.api.defaultPromptType;
+    const systemPromptTypeFromRequest = body.prompt_type || shopConfig.functionality?.systemPrompt || AppConfig.api.defaultPromptType;
     const llmProvider = body.llm_provider?.toLowerCase() || shopConfig.apiManagement?.selectedAPI?.toLowerCase() || 'gemini';
 
+    let systemPromptContent = "";
+    if (promptsFromFile && promptsFromFile[systemPromptTypeFromRequest] && promptsFromFile[systemPromptTypeFromRequest].system_prompt) {
+        systemPromptContent = promptsFromFile[systemPromptTypeFromRequest].system_prompt;
+    } else if (promptsFromFile && promptsFromFile['standardAssistant'] && promptsFromFile['standardAssistant'].system_prompt) {
+        // Fallback to standardAssistant if the selected one isn't found or is malformed
+        console.warn(`System prompt type "${systemPromptTypeFromRequest}" not found or malformed in prompts.json. Falling back to standardAssistant.`);
+        systemPromptContent = promptsFromFile['standardAssistant'].system_prompt;
+    } else {
+        // Further fallback if standardAssistant is also missing (should not happen if prompts.json is correct)
+        console.error("Critical: standardAssistant prompt not found in prompts.json. Using a hardcoded emergency default.");
+        systemPromptContent = "You are a helpful AI assistant for an e-commerce store. Be helpful and concise.";
+    }
+    // console.log(`DEBUG: Using system prompt type: ${systemPromptTypeFromRequest}`);
+    // console.log(`DEBUG: System prompt content (first 100 chars): ${systemPromptContent.substring(0,100)}`);
 
     // Create a stream for the response
     const responseStream = createSseStream(async (stream) => {
@@ -157,7 +172,7 @@ async function handleChatRequest(request) {
         shopConfig, // Pass the fetched shopConfig
         userMessage,
         conversationId,
-        promptType, // Use resolved promptType
+        systemPromptContent, // Pass the resolved system prompt content
         llmProvider,  // Use resolved llmProvider
         stream
       });
@@ -196,7 +211,7 @@ async function handleChatRequest(request) {
  * @param {object} params.shopConfig - The shop-specific configuration.
  * @param {string} params.userMessage - The user's message
  * @param {string} params.conversationId - The conversation ID
- * @param {string} params.promptType - The prompt type (resolved from body or shopConfig)
+ * @param {string} params.systemPromptContent - The actual system prompt text.
  * @param {string} params.llmProvider - The LLM provider (resolved from body or shopConfig)
  * @param {Object} params.stream - Stream manager for sending responses
  */
@@ -206,8 +221,8 @@ async function handleChatSession({
   shopConfig,
   userMessage,
   conversationId,
-  promptType, // Already resolved using shopConfig if from body
-  llmProvider, // Already resolved using shopConfig if from body
+  systemPromptContent,
+  llmProvider,
   stream
 }) {
   let llmService;
@@ -341,14 +356,14 @@ async function handleChatSession({
       }
     };
 
-    // System prompt type from shopConfig
-    const systemPromptType = shopConfig.functionality?.systemPrompt || AppConfig.api.defaultPromptType;
+    // System prompt content is now passed directly.
+    // const systemPromptType = shopConfig.functionality?.systemPrompt || AppConfig.api.defaultPromptType; // This line is no longer needed here
 
     if (llmProvider === 'gemini') {
-      await llmService.streamGeminiConversation(
+      await llmService.streamGeminiConversation( // This function will need to accept systemPromptContent
         {
           messages: conversationHistory,
-          promptType: systemPromptType, // Use from shopConfig
+          systemInstruction: systemPromptContent, // Pass content to Gemini service
           tools: mcpClient.tools,
           conversationId
         },
@@ -389,14 +404,14 @@ async function handleChatSession({
           toolResponse: toolExecutionResultForLLM,
           streamHandlers: { sendMessage: stream.sendMessage },
           conversationId,
-          promptType: systemPromptType
+          systemInstruction: systemPromptContent // Pass content for continuation
         });
       }
     } else { // Claude provider
-      await llmService.streamConversation(
+      await llmService.streamConversation( // This function will need to accept systemPromptContent
         {
           messages: conversationHistory,
-          promptType: systemPromptType, // Use from shopConfig
+          system: systemPromptContent, // Pass content to Claude service (Claude SDK uses 'system' field)
           tools: mcpClient.tools
         },
         {
@@ -447,9 +462,9 @@ async function handleChatSession({
             await saveMessage(conversationId, 'user', JSON.stringify(toolResultMessage.content));
 
             // Call Claude again with the tool result
-            await llmService.streamConversation({
+            await llmService.streamConversation({ // Pass systemPromptContent again
                 messages: conversationHistory,
-                promptType: systemPromptType,
+                system: systemPromptContent,
                 tools: mcpClient.tools
             },
             // Simplified re-entrant handlers for subsequent calls

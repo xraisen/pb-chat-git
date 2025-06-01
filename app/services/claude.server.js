@@ -3,15 +3,15 @@
  * Manages interactions with the Claude API
  */
 import { Anthropic } from "@anthropic-ai/sdk";
-import AppConfig from "./config.server";
-import systemPrompts from "../prompts/prompts.json";
+import AppConfig from "./config.server"; // Keep for AppConfig.api.maxTokens and defaultModel if needed
 
 /**
  * Creates a Claude service instance
  * @param {string} apiKey - Claude API key
+ * @param {string} [modelName] - Optional model name to use
  * @returns {Object} Claude service with methods for interacting with Claude API
  */
-export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
+export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY, modelName = AppConfig.api.defaultClaudeModel || "claude-3-haiku-20240307") {
   // Initialize Claude client
   const anthropic = new Anthropic({ apiKey });
 
@@ -19,7 +19,7 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
    * Streams a conversation with Claude
    * @param {Object} params - Stream parameters
    * @param {Array} params.messages - Conversation history
-   * @param {string} params.promptType - The type of system prompt to use
+   * @param {string} params.system - The full system prompt content.
    * @param {Array} params.tools - Available tools for Claude
    * @param {Object} streamHandlers - Stream event handlers
    * @param {Function} streamHandlers.onText - Handles text chunks
@@ -29,17 +29,16 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
    */
   const streamConversation = async ({ 
     messages, 
-    promptType = AppConfig.api.defaultPromptType, 
+    system, // Changed from promptType to system (full content)
     tools 
   }, streamHandlers) => {
-    // Get system prompt from configuration or use default
-    const systemInstruction = getSystemPrompt(promptType);
+    // System prompt content is now passed directly as 'system'
 
     // Create stream
     const stream = await anthropic.messages.stream({
-      model: AppConfig.api.defaultModel,
-      max_tokens: AppConfig.api.maxTokens,
-      system: systemInstruction,
+      model: modelName, // Use modelName passed to createClaudeService
+      max_tokens: AppConfig.api.maxTokens || 4096, // Ensure a default for maxTokens
+      system: system, // Use the passed system prompt content
       messages,
       tools: tools && tools.length > 0 ? tools : undefined
     });
@@ -68,19 +67,13 @@ export function createClaudeService(apiKey = process.env.CLAUDE_API_KEY) {
     return finalMessage;
   };
 
-  /**
-   * Gets the system prompt content for a given prompt type
-   * @param {string} promptType - The prompt type to retrieve
-   * @returns {string} The system prompt content
-   */
-  const getSystemPrompt = (promptType) => {
-    return systemPrompts.systemPrompts[promptType]?.content || 
-      systemPrompts.systemPrompts[AppConfig.api.defaultPromptType].content;
-  };
+  // getSystemPrompt is no longer needed here as the content is passed from chat.jsx
+  // If other functions in this file were to use it, it could remain.
+  // For now, assuming only streamConversation used it for system prompt resolution.
 
   return {
-    streamConversation,
-    getSystemPrompt
+    streamConversation
+    // getSystemPrompt // Can be removed if not used elsewhere by this service
   };
 }
 
