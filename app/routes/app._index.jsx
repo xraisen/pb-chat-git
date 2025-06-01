@@ -26,8 +26,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { authenticate } from "../../shopify.server"; // Corrected path
-import { getChatInteractionStats, getRecentChatInteractions } from "../../db.server.js"; // Corrected path
+import { authenticate } from "../../shopify.server";
+import {
+  getChatInteractionStats,
+  getRecentChatInteractions,
+  getMessageFeedbackStats,  // Added
+  getRecentMessageFeedback // Added
+} from "../../db.server.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -35,20 +40,22 @@ export const loader = async ({ request }) => {
 
   try {
     const stats = await getChatInteractionStats(shop);
-    const recentInteractions = await getRecentChatInteractions(shop, 5); // Fetch 5 recent interactions
+    const recentInteractions = await getRecentChatInteractions(shop, 5);
+    const feedbackStats = await getMessageFeedbackStats(shop);
+    const recentFeedbackWithComments = await getRecentMessageFeedback(shop, 5);
 
-    if (stats.error) { // Check if stats itself has an error property from db helper
+    if (stats.error || feedbackStats.error) {
         return json({
             shopName: shop,
-            stats: {
-                totalInteractions: 0,
-                chatOpenedCount: 0,
-                addToCartCount: 0,
-                checkoutsInitiatedCount: 0,
-                interactionsOverTime: []
-            },
+            stats: stats.error ? {
+                totalInteractions: 0, chatOpenedCount: 0, addToCartCount: 0, checkoutsInitiatedCount: 0, interactionsOverTime: []
+            } : stats,
             recentInteractions: [],
-            loaderError: stats.error
+            feedbackStats: feedbackStats.error ? {
+                upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0
+            } : feedbackStats,
+            recentFeedbackWithComments: [],
+            loaderError: stats.error || feedbackStats.error || "Failed to load some dashboard data."
         }, { status: 500 });
     }
 
@@ -56,27 +63,29 @@ export const loader = async ({ request }) => {
       shopName: shop,
       stats,
       recentInteractions,
+      feedbackStats,
+      recentFeedbackWithComments,
       loaderError: null,
     });
   } catch (error) {
     console.error("Error in dashboard loader:", error);
     return json({
       shopName: shop,
-      stats: { // Provide default structure on error
-        totalInteractions: 0,
-        chatOpenedCount: 0,
-        addToCartCount: 0,
-        checkoutsInitiatedCount: 0,
-        interactionsOverTime: [],
+      stats: {
+        totalInteractions: 0, chatOpenedCount: 0, addToCartCount: 0, checkoutsInitiatedCount: 0, interactionsOverTime: []
       },
       recentInteractions: [],
+      feedbackStats: {
+        upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0
+      },
+      recentFeedbackWithComments: [],
       loaderError: "Failed to load dashboard data.",
     }, { status: 500 });
   }
 };
 
 export default function Index() {
-  const { shopName, stats, recentInteractions, loaderError } = useLoaderData();
+  const { shopName, stats, recentInteractions, feedbackStats, recentFeedbackWithComments, loaderError } = useLoaderData();
 
   const renderStatCard = (title, value, helpText = null) => (
     <Card roundedAbove="sm" padding="400">
@@ -190,6 +199,64 @@ export default function Index() {
                         </EmptyState>
                     )}
                 </BlockStack>
+            </Card>
+          </Layout.Section>
+
+          {/* Message Feedback Section */}
+          <Layout.Section>
+            <Card title="Message Feedback Overview">
+              <BlockStack gap="300" padding="400">
+                {feedbackStats.error && <Banner tone="warning">{feedbackStats.error}</Banner>}
+                <Text as="p" variant="bodyMd">
+                  Positive Feedback: <strong>{feedbackStats.positiveFeedbackPercentage ?? 'N/A'}%</strong>
+                </Text>
+                <Grid columns={{ xs:1, sm:3}}>
+                  <Grid.Cell><Text as="p" variant="bodySm">Total Upvotes: {feedbackStats.upvotes ?? '0'}</Text></Grid.Cell>
+                  <Grid.Cell><Text as="p" variant="bodySm">Total Downvotes: {feedbackStats.downvotes ?? '0'}</Text></Grid.Cell>
+                  <Grid.Cell><Text as="p" variant="bodySm">Total Feedback: {feedbackStats.totalFeedback ?? '0'}</Text></Grid.Cell>
+                </Grid>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
+          <Layout.Section>
+            <Card title="Recent Feedback Comments">
+              <BlockStack gap="400" padding="400">
+                {recentFeedbackWithComments && recentFeedbackWithComments.length > 0 ? (
+                  <List>
+                    {recentFeedbackWithComments.map((fb) => (
+                      <List.Item key={fb.id}>
+                        <BlockStack gap="150"> {/* Increased gap slightly */}
+                          <Text variant="bodyMd">
+                            <strong>Comment:</strong> {fb.comment ? `"${fb.comment}"` : <Text as="span" tone="subduedItalic">No comment provided.</Text>}
+                          </Text>
+                          <LegacyStack distribution="equalSpacing" spacing="loose">
+                            <Text variant="bodySm" tone={fb.rating === "UP" ? "success" : (fb.rating === "DOWN" ? "critical" : "subdued")}>
+                                Rated: <strong>{fb.rating}</strong>
+                            </Text>
+                            <Text variant="bodySm" tone="subdued">
+                                On: {new Date(fb.timestamp).toLocaleString()}
+                            </Text>
+                          </LegacyStack>
+                           <Text variant="bodyXs" tone="subdued">
+                                Message: "{fb.messageContent.substring(0, 100)}{fb.messageContent.length > 100 ? '...' : ''}"
+                           </Text>
+                           <Text variant="bodyXs" tone="subdued">
+                                Conv. ID: {fb.conversationId}
+                           </Text>
+                        </BlockStack>
+                      </List.Item>
+                    ))}
+                  </List>
+                ) : (
+                  <EmptyState
+                    heading="No comments yet"
+                    image="https://cdn.shopify.com/s/files/1/0262/4074/files/emptystate-files.png"
+                  >
+                    <p>When users leave comments with their feedback, they will appear here.</p>
+                  </EmptyState>
+                )}
+              </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>
