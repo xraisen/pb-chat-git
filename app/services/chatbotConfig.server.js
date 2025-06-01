@@ -84,13 +84,13 @@ export async function getChatbotConfig(shopId) {
 
   try {
     const configString = await redis.get(redisKey);
-    console.log(`RAW configString from Redis for shop ${shopId} (${redisKey}): [${configString}]`); // <-- ADDED THIS LINE
+    // console.log(`RAW configString from Redis for shop ${shopId} (${redisKey}): [${configString}]`); // <-- REMOVED THIS LINE
     if (configString) {
       try { // Added try-catch for JSON.parse
         const savedConfig = JSON.parse(configString);
         mergedConfig = deepMerge(mergedConfig, savedConfig);
       } catch (parseError) {
-        console.error(`Error parsing configString for shop ${shopId} from Redis:`, parseError, `Raw string: [${configString}]`);
+        console.error(`Error parsing configString for shop ${shopId} from Redis:`, parseError); // MODIFIED THIS LINE
         // mergedConfig remains as defaults if parsing fails
       }
       console.log(`Configuration loaded from Redis for shop ${shopId} (or defaults if parsing failed).`);
