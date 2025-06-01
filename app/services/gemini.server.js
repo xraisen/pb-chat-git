@@ -2,8 +2,8 @@
  * Gemini Service
  * Manages interactions with the Google Gemini API
  */
-import AppConfig from "./config.server";
-import systemPrompts from "../prompts/prompts.json";
+import AppConfig from "./config.server"; // Keep for AppConfig.api.maxTokens and defaultModel
+// import systemPrompts from "../prompts/prompts.json"; // No longer needed here
 
 // Helper to map OpenAPI/Claude schema types to Gemini schema types
 function mapTypeToGemini(claudeType) {
@@ -94,15 +94,16 @@ function formatMessagesForGemini(messages, systemInstruction) {
 /**
  * Creates a Gemini service instance
  * @param {string} apiKey - Gemini API key
+ * @param {string} [modelName] - Optional model name to use (e.g., "gemini-pro")
  * @returns {Object} Gemini service with methods for interacting with Gemini API
  */
-export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
+export function createGeminiService(apiKey = process.env.GEMINI_API_KEY, modelName = AppConfig.api.defaultGeminiModel || "gemini-pro") {
   /**
    * Streams a conversation with Gemini
    * @param {Object} params - Stream parameters
    * @param {Array} params.messages - Conversation history (Claude format)
-   * @param {string} params.promptType - The type of system prompt to use
-   * @param {Array} params.tools - Available tools (Claude format) - currently logged, not passed to Gemini
+   * @param {string} params.systemInstruction - The full system prompt content.
+   * @param {Array} params.tools - Available tools (Claude format)
    * @param {Object} streamHandlers - Stream event handlers
    * @param {Function} streamHandlers.sendMessage - Handles sending SSE messages to client
    * @param {string} params.conversationId - The current conversation ID (optional, for event emulation)
@@ -110,9 +111,9 @@ export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
    */
   const streamGeminiConversation = async ({
     messages,
-    promptType = AppConfig.api.defaultPromptType,
+    systemInstruction, // Changed from promptType
     tools,
-    conversationId // Used for emulating 'id' event
+    conversationId
   }, streamHandlers) => {
     
     if (!apiKey) {
@@ -122,7 +123,7 @@ export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
       return;
     }
 
-    const systemInstruction = getSystemPrompt(promptType);
+    // systemInstruction is now passed directly.
     const formattedMessages = formatMessagesForGemini(messages, systemInstruction);
     
     let geminiToolsPayload = null;
@@ -233,21 +234,13 @@ export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
     }
   };
 
-  /**
-   * Gets the system prompt content for a given prompt type.
-   * For Gemini, this raw string will be incorporated into the `contents` array.
-   * @param {string} promptType - The prompt type to retrieve
-   * @returns {string} The system prompt content
-   */
-  const getSystemPrompt = (promptType) => {
-    return systemPrompts.systemPrompts[promptType]?.content ||
-      systemPrompts.systemPrompts[AppConfig.api.defaultPromptType].content;
-  };
+  // getSystemPrompt is no longer needed here if systemInstruction is always passed.
+  // const getSystemPrompt = (promptType) => { ... };
 
   return {
     streamGeminiConversation,
-    getSystemPrompt,
-    streamGeminiResponseAfterToolExecution, // Export the new function
+    // getSystemPrompt, // Can be removed if not used by other methods in this service
+    streamGeminiResponseAfterToolExecution,
   };
 }
 
@@ -255,11 +248,12 @@ export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
 // New function to handle streaming response after a tool execution
 const streamGeminiResponseAfterToolExecution = async ({
   apiKey = process.env.GEMINI_API_KEY,
-  existingMessages, // Gemini `Contents` format, including the model's part with the functionCall
+  existingMessages,
   toolName,
-  toolResponse, // This should be the JSON result from MCPClient.callTool
+  toolResponse,
   streamHandlers,
-  conversationId
+  conversationId,
+  systemInstruction // Added systemInstruction here for consistency if needed by formatMessagesForGemini
 }) => {
   if (!apiKey) {
     console.error("[Gemini Service] API key is missing for tool response call.");

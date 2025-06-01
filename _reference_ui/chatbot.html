@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <link rel="stylesheet" href="chatbot_styles.css">
+</head>
+<body>
+    <div id="chatbotContainer">
+        <div id="chatbotHeader">
+            <img src="" alt="Avatar" id="chatbotAvatarImg" style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px; display: none;"/> <!-- Initially hidden if no src -->
+            <span id="chatbotTitle">Chatbot</span> <!-- Default name -->
+        </div>
+        <div id="chatboxMessages">
+            <!-- Greeting message will be dynamically inserted by JS if configured -->
+            <!-- Fallback static greeting if JS fails or no config for greeting -->
+            <!-- <div class="message bot-message" id="initialGreetingMessageContainer">
+                <p id="greetingMessage">Hello! How can I help you today?</p>
+            </div> -->
+            <!-- Messages will be appended here by JavaScript -->
+        </div>
+        <div id="chatbotInputArea">
+            <input type="text" id="userInputField" placeholder="Type your message...">
+            <button id="sendMessageButton">Send</button>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="api_handler.js"></script>
+    <script src="chatbot_ui_logic.js"></script>
+</body>
+</html>
