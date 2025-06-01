@@ -39,6 +39,18 @@ export const action = async ({ request }) => {
   // as updateAppConfiguration expects strings or null.
   const geminiApiKey = formData.get('geminiApiKey') || "";
   const claudeApiKey = formData.get('claudeApiKey') || "";
+  const errors = {};
+
+  if (llmProvider === 'gemini' && !geminiApiKey) {
+    errors.geminiApiKey = "Gemini API key is required when Gemini is selected.";
+  }
+  if (llmProvider === 'claude' && !claudeApiKey) {
+    errors.claudeApiKey = "Claude API key is required when Claude is selected.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return json({ errors, llmProvider, geminiApiKey, claudeApiKey }, { status: 400 });
+  }
 
   try {
     // Pass only the relevant fields for this form to updateShopChatbotConfig
@@ -87,15 +99,25 @@ export default function AISettingsPage() {
   ];
 
   const isSubmitting = navigation.state === "submitting";
-  const pageError = loaderData?.error || actionData?.error;
+  // pageError is for general errors, formErrors for field-specific ones.
+  const pageError = loaderData?.error || actionData?.error || (actionData?.errors && Object.keys(actionData.errors).length > 0 ? "Please correct the errors below." : null);
+  const formErrors = actionData?.errors || {};
+
 
   return (
     <Page>
       <TitleBar title="AI Settings" />
       <Layout>
-        {pageError && (
+        {pageError && !actionData?.errors && ( // Show general page error only if no specific form errors
           <Layout.Section>
-            <Banner title="Error" tone="critical" onDismiss={() => { /* Clear error if needed */ }}>
+            <Banner title="Information" tone={actionData?.success ? "success" : "critical"} onDismiss={() => { /* Ideally clear actionData or specific message */ }}>
+              <p>{pageError || actionData?.message}</p>
+            </Banner>
+          </Layout.Section>
+        )}
+         {pageError && actionData?.errors && Object.keys(actionData.errors).length > 0 && (
+          <Layout.Section>
+            <Banner title="Errors in form" tone="critical" onDismiss={() => {}}>
               <p>{pageError}</p>
             </Banner>
           </Layout.Section>
@@ -122,6 +144,7 @@ export default function AISettingsPage() {
                     onChange={handleGeminiApiKeyChange}
                     autoComplete="new-password"
                     helpText="Enter your Gemini API key. This is kept confidential. Leave blank if you do not want to use Gemini or to clear an existing key."
+                    error={formErrors.geminiApiKey}
                   />
                 )}
                 {llmProvider === 'claude' && (
@@ -133,6 +156,7 @@ export default function AISettingsPage() {
                     onChange={handleClaudeApiKeyChange}
                     autoComplete="new-password"
                     helpText="Enter your Claude API key. This is kept confidential. Leave blank if you do not want to use Claude or to clear an existing key."
+                    error={formErrors.claudeApiKey}
                   />
                 )}
                   <Button submit primary loading={isSubmitting}>
