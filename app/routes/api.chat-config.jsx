@@ -56,16 +56,6 @@ export async function loader({ request }) {
       );
     }
 
-    const fullConfig = await getShopChatbotConfig(shopDomain);
-
-    if (!fullConfig || fullConfig.error) {
-      const errorMessage = fullConfig && fullConfig.error ? fullConfig.error : "Configuration not found for this shop.";
-      return json(
-        { error: errorMessage },
-        { status: 404, headers: getCorsHeaders(requestOrigin) }
-      );
-    }
-
     const activeMessages = await getPromotionalMessages(shopDomain, true);
     const activeProducts = await getPromotionalProducts(shopDomain, true);
 

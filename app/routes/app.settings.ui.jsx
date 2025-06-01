@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  Page, Layout, Card, FormLayout, TextField, Select, Button, BlockStack, ChoiceList, Banner, Collapsible, Icon, LegacyStack, Tooltip, Text as PolarisText
+  Page, Layout, Card, FormLayout, TextField, Select, Button, BlockStack, ChoiceList, Banner, Collapsible, Icon, LegacyStack, Tooltip, Text as PolarisText, DropZone, Thumbnail
 } from '@shopify/polaris';
 import { TitleBar } from "@shopify/app-bridge-react";
-import { Form as RemixForm, useLoaderData, useActionData, useNavigation, json } from "@remix-run/react";
+import { Form as RemixForm, useLoaderData, useActionData, useNavigation, json, useSubmit, useFetcher } from "@remix-run/react"; // Added useFetcher
 import { redirect } from "@remix-run/node";
 import { authenticate } from "../../shopify.server";
 import { InfoMinor } from '@shopify/polaris-icons';
@@ -50,8 +50,35 @@ export const action = async ({ request }) => {
   const formData = await request.formData();
   const formErrors = {};
   let pageError = null;
+  const operation = formData.get("_action"); // Used for removeAvatar
 
+  if (operation === "removeAvatar") {
+    try {
+      await updateShopChatbotConfig(shop, { avatarUrl: null });
+      // It's important to also clear any potential file upload fields if they were part of this form submission.
+      // For now, just returning success. The client will need to update its preview.
+      return json({ success: true, message: "Avatar removed.", anActionTookPlace: true });
+    } catch (error) {
+      console.error("Failed to remove avatar:", error);
+      return json({ errors: { general: "Failed to remove avatar." } }, { status: 500 });
+    }
+  }
+
+  // This is for the main form save. Avatar URL is handled by dedicated upload/remove actions.
   const settingsData = {
+    // avatarUrl is NOT part of the main form submission data anymore.
+    // It's updated via the dedicated upload API or the removeAvatar action.
+    // The main save action here could potentially save the existing avatarUrl if no new file is staged.
+    // For now, it will re-save whatever is in the `avatarUrl` hidden field or state.
+    // This part needs to be coordinated with the actual file upload process.
+    // Let's assume avatarUrl is part of the main form data for now if it's a text field.
+    // Since we are moving to DropZone, the main form save will not directly handle avatarUrl from a text field.
+    // It will be set by a dedicated upload process or by the remove action.
+    // The `avatarUrl` field on `settingsData` should reflect the URL *after* an upload or removal.
+    // For now, we'll keep it simple: the main form saves all text-based fields.
+    // `avatarUrl` will be updated by a separate mechanism (upload API or remove action).
+    // We can still pass formData.get("avatarUrl") if we add a hidden input field updated by client state.
+
     botName: formData.get("botName"),
     welcomeMessage: formData.get("welcomeMessage"),
     systemPromptKey: formData.get("systemPromptKey"),
@@ -70,7 +97,7 @@ export const action = async ({ request }) => {
     assistantMsgBgColor: formData.get("assistantMsgBgColor"),
     assistantMsgTextColor: formData.get("assistantMsgTextColor"),
     customCSS: formData.get("customCSS"),
-    avatarUrl: formData.get("avatarUrl"),
+    // avatarUrl: formData.get("avatarUrl"), // Removed from main form data; handled by dedicated actions
     productDisplayMode: formData.get("productDisplayMode"),
     maxProductsToDisplay: formData.get("maxProductsToDisplay") ? parseInt(formData.get("maxProductsToDisplay"), 10) : null,
     carouselItemWidth: formData.get("carouselItemWidth"),
@@ -141,14 +168,121 @@ export default function UISettingsPage() {
   const [chatBubbleSize, setChatBubbleSize] = useState(initialSettings.chatBubbleSize ?? "60px");
   const [chatBubbleColor, setChatBubbleColor] = useState(initialSettings.chatBubbleColor ?? "#E57399");
 
+  // Avatar State
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(initialSettings.avatarUrl || null);
+  const [uploadError, setUploadError] = useState(null);
+  // const [isRemovingAvatar, setIsRemovingAvatar] = useState(false); // Replaced by fetcher state
+  const submit = useSubmit();
+  const avatarUploadFetcher = useFetcher();
+  const removeAvatarFetcher = useFetcher(); // Separate fetcher for remove action
+
+  const [uploadStatusMessage, setUploadStatusMessage] = useState('');
+  const [uploadStatusTone, setUploadStatusTone] = useState('info');
+
+
   // State for Collapsible sections
   const [isColorsOpen, setIsColorsOpen] = useState(true);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [systemPromptHelpModalOpen, setSystemPromptHelpModalOpen] = useState(false);
 
+
   const handleToggleColors = useCallback(() => setIsColorsOpen((open) => !open), []);
   const handleToggleAdvanced = useCallback(() => setIsAdvancedOpen((open) => !open), []);
   const toggleSystemPromptHelpModal = useCallback(() => setSystemPromptHelpModalOpen((active) => !active), []);
+
+  // Sync avatarUrl from loader to both avatarUrl state and avatarPreviewUrl state
+  useEffect(() => {
+    setAvatarUrl(initialSettings.avatarUrl || ""); // Update the main avatarUrl state for the form
+    setAvatarPreviewUrl(initialSettings.avatarUrl || null); // Update preview
+  }, [initialSettings.avatarUrl]);
+
+  // Handle avatar upload fetcher state
+  useEffect(() => {
+    if (avatarUploadFetcher.state === 'idle' && avatarUploadFetcher.data) {
+      if (avatarUploadFetcher.data.success) {
+        setUploadStatusMessage(avatarUploadFetcher.data.message || "Avatar uploaded successfully!");
+        setUploadStatusTone("success");
+        setAvatarUrl(avatarUploadFetcher.data.avatarUrl); // Update main avatarUrl state
+        setAvatarPreviewUrl(avatarUploadFetcher.data.avatarUrl);
+        setAvatarFile(null);
+      } else {
+        setUploadStatusMessage(avatarUploadFetcher.data.error || "Upload failed. Please try again.");
+        setUploadStatusTone("critical");
+      }
+    } else if (avatarUploadFetcher.state === 'submitting' || avatarUploadFetcher.state === 'loading') {
+      setUploadStatusMessage("Uploading avatar...");
+      setUploadStatusTone("info");
+    }
+  }, [avatarUploadFetcher.state, avatarUploadFetcher.data, setAvatarUrl]);
+
+  // Handle remove avatar fetcher state
+   useEffect(() => {
+    if (removeAvatarFetcher.state === 'idle' && removeAvatarFetcher.data) {
+      if (removeAvatarFetcher.data.success) {
+        setUploadStatusMessage(removeAvatarFetcher.data.message || "Avatar removed.");
+        setUploadStatusTone("success");
+        setAvatarUrl(""); // Clear main avatarUrl state
+        setAvatarPreviewUrl(null);
+        setAvatarFile(null);
+      } else {
+        setUploadStatusMessage(removeAvatarFetcher.data.error || "Failed to remove avatar.");
+        setUploadStatusTone("critical");
+      }
+    }
+  }, [removeAvatarFetcher.state, removeAvatarFetcher.data, setAvatarUrl]);
+
+
+  const handleAvatarDrop = useCallback(
+    (_droppedFiles, acceptedFiles, rejectedFiles) => {
+      if (rejectedFiles.length > 0) {
+        setUploadError(`File rejected: ${rejectedFiles[0].errors[0].message}. Please use a valid image (PNG, JPG, GIF) under 1MB.`);
+        setAvatarFile(null);
+        // Do not clear avatarPreviewUrl here, user might want to keep existing if new upload fails
+        return;
+      }
+      if (acceptedFiles.length > 0) {
+        const file = acceptedFiles[0];
+        setAvatarFile(file); // This file should be uploaded on main form submit or dedicated button
+        setAvatarPreviewUrl(URL.createObjectURL(file));
+        setUploadError(null);
+        // To include this in the main form submit, we'd need to use a file input or FormData append.
+        // For now, this state is for preview. Real upload is next step.
+      }
+    },
+    [],
+  );
+
+  const handleRemoveAvatar = useCallback(() => {
+    if (!confirm("Are you sure you want to remove the avatar?")) return;
+    const formData = new FormData();
+    formData.append("_action", "removeAvatar");
+    removeAvatarFetcher.submit(formData, { method: "post", action: "/app/settings/ui" }); // Submit to page's action
+    setAvatarFile(null); // Clear any staged file immediately
+  }, [removeAvatarFetcher]);
+
+  const handleAvatarUpload = useCallback(async () => {
+    if (!avatarFile) {
+      setUploadError("No file selected to upload.");
+      setUploadStatusMessage("No file selected.");
+      setUploadStatusTone("warning");
+      return;
+    }
+
+    setUploadStatusMessage("Uploading avatar...");
+    setUploadStatusTone("info");
+    setUploadError(null);
+
+    const uploadFormData = new FormData();
+    uploadFormData.append("avatarFile", avatarFile);
+
+    avatarUploadFetcher.submit(uploadFormData, {
+      method: "post",
+      encType: "multipart/form-data",
+      action: "/api/upload-avatar",
+    });
+  }, [avatarFile, avatarUploadFetcher]);
+
 
   const handleSystemPromptChange = useCallback((value) => setSystemPromptKey(value), []);
   const handlePositionChange = useCallback((value) => setPosition(value), []);
@@ -298,13 +432,72 @@ export default function UISettingsPage() {
                                   helpText="Size of the chat bubble button (e.g., 60px)."
                                 />
                                 <TextField label="Chat Bubble Color (Hex)" name="chatBubbleColor" value={chatBubbleColor} onChange={setChatBubbleColor} autoComplete="off" />
-                                <TextField label="Assistant Avatar URL" name="avatarUrl" value={avatarUrl} onChange={setAvatarUrl} autoComplete="off" helpText="URL for the assistant's avatar image."/>
+                                {/* Avatar URL TextField is removed in favor of DropZone */}
                             </FormLayout.Group>
                         </FormLayout>
                     </BlockStack>
                 </Card>
+                 <Card title="Chatbot Avatar">
+                  <BlockStack gap="400" padding="400">
+                    <DropZone
+                        label="Avatar Image"
+                        onDrop={handleAvatarDrop}
+                        accept="image/jpeg, image/png, image/gif"
+                        type="image"
+                        maxSize={1024 * 1024} // 1MB
+                    >
+                      {avatarFile ? (
+                        <LegacyStack vertical alignment="center" spacing="tight">
+                          <Thumbnail size="large" alt={avatarFile.name} source={avatarPreviewUrl} />
+                          <PolarisText variant="bodySm" as="p">File: {avatarFile.name} ({(avatarFile.size / 1024).toFixed(2)} KB)</PolarisText>
+                          <Button variant="plain" onClick={() => { setAvatarFile(null); setAvatarPreviewUrl(initialSettings.avatarUrl || null); /* Reset to original or clear if no original */ }}>Clear selection</Button>
+                        </LegacyStack>
+                      ) : avatarPreviewUrl ? (
+                        <LegacyStack vertical alignment="center" spacing="tight">
+                          <Thumbnail size="large" alt="Current Avatar" source={avatarPreviewUrl} />
+                           <PolarisText variant="bodySm" as="p">Current avatar. Upload a new file to change or remove.</PolarisText>
+                        </LegacyStack>
+                      ) : (
+                        <DropZone.FileUpload actionHint="Accepts .png, .gif, .jpg. Max 1MB." />
+                      )}
+                    </DropZone>
+                    {uploadError && (
+                      <Banner title="Upload Error" tone="critical" onDismiss={() => setUploadError(null)}>
+                        <p>{uploadError}</p>
+                      </Banner>
+                    )}
+                    {/* <input type="hidden" name="avatarUrl" value={avatarUrl || ""} /> Removed, avatarUrl is not part of main form save */}
+
+                    <LegacyStack distribution="trailing" spacing="tight">
+                       {avatarPreviewUrl && (
+                        <Button
+                          onClick={handleRemoveAvatar}
+                          destructive
+                          loading={removeAvatarFetcher.state === "submitting"}
+                        >
+                          Remove Avatar
+                        </Button>
+                       )}
+                       <Button
+                         primary
+                         onClick={handleAvatarUpload}
+                         loading={avatarUploadFetcher.state === "submitting"}
+                         disabled={!avatarFile}
+                       >
+                         Upload Selected Avatar
+                       </Button>
+                    </LegacyStack>
+                     {uploadStatusMessage && (
+                      <div style={{ marginTop: '1rem', width: '100%' }}>
+                        <Banner title="Avatar Upload Status" tone={uploadStatusTone} onDismiss={() => setUploadStatusMessage('')}>
+                          <p>{uploadStatusMessage}</p>
+                        </Banner>
+                      </div>
+                    )}
+                  </BlockStack>
+                </Card>
                 <Card roundedAbove="sm">
-                    <BlockStack gap="500">
+                    <BlockStack gap="500"> {/* This Card already has padding="400" via BlockStack in its definition */}
                         <FormLayout>
                             <FormLayout.Group title="Product Display">
                                 <Select label="Product Display Mode" name="productDisplayMode" options={productDisplayModeOptions} value={productDisplayMode} onChange={handleProductDisplayModeChange} />
