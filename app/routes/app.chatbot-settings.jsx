@@ -23,7 +23,7 @@ export async function loader({ request }) {
         config: defaultChatbotConfig,
         shopId: null,
         apiKey: process.env.SHOPIFY_API_KEY || "",
-        promptOptions: [{ label: "Standard Assistant (Error)", value: "standardAssistant" }],
+        promptOptions: [{ label: "Standard Assistant (Error Loading Prompts)", value: "standardAssistant" }],
         loaderErrorMsg
     }, { status: 401 });
   }
@@ -124,40 +124,38 @@ export async function action({ request }) {
     }
   }
 
-  function setMissingBooleans(targetUpdates, referenceConfig, currentPathParts = []) {
+  function setMissingBooleans(targetUpdates, referenceConfig, pathPrefix = "") {
     Object.keys(referenceConfig).forEach(key => {
-      const newPathParts = [...currentPathParts, key];
-      if (isObject(referenceConfig[key])) {
-        let currentTargetLevel = targetUpdates;
-        for(let i=0; i < newPathParts.length -1; ++i) {
-            currentTargetLevel = currentTargetLevel[newPathParts[i]];
-            if (!currentTargetLevel) break;
-        }
-        if(currentTargetLevel && !currentTargetLevel[key]) currentTargetLevel[key] = {};
-        if(currentTargetLevel && currentTargetLevel[key]) {
-             setMissingBooleans(currentTargetLevel[key], referenceConfig[key], []);
-        }
-      } else if (typeof referenceConfig[key] === 'boolean') {
-        let valueInUpdates = targetUpdates;
-        let pathExists = true;
-        for(const part of newPathParts.slice(currentPathParts.length)) {
-            if(valueInUpdates && part in valueInUpdates) {
-                valueInUpdates = valueInUpdates[part];
-            } else { pathExists = false; break; }
-        }
-        if (!pathExists) {
-            let currentTargetLevel = targetUpdates;
-            for(let i=0; i < newPathParts.length -1; ++i) {
-                const part = newPathParts[i];
-                currentTargetLevel[part] = currentTargetLevel[part] || {};
-                currentTargetLevel = currentTargetLevel[part];
+      const currentPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+      const refValue = referenceConfig[key];
+      if (isObject(refValue)) {
+        if (!targetUpdates[key]) targetUpdates[key] = {};
+        setMissingBooleans(targetUpdates[key], refValue, currentPath);
+      } else if (typeof refValue === 'boolean') {
+        const targetValue = getNestedValue(targetUpdates, key.substring(pathPrefix.length ? pathPrefix.length + 1 : 0)); // check relative path
+        if (typeof targetValue === 'undefined') {
+            let currentLevelTarget = targetUpdates;
+            const parts = key.split('.'); // use full path for setting
+             for (let i = 0; i < parts.length - 1; i++) {
+                currentLevelTarget[parts[i]] = currentLevelTarget[parts[i]] || {};
+                currentLevelTarget = currentLevelTarget[parts[i]];
             }
-            currentTargetLevel[newPathParts[newPathParts.length-1]] = false;
+            currentLevelTarget[parts[parts.length - 1]] = false;
         }
       }
     });
   }
-  setMissingBooleans(updates, defaultChatbotConfig);
+  Object.keys(defaultChatbotConfig).forEach(sectionKey => {
+    if (updates[sectionKey]) {
+        setMissingBooleans(updates[sectionKey], defaultChatbotConfig[sectionKey], sectionKey);
+    } else {
+        if (Object.values(defaultChatbotConfig[sectionKey]).some(v => typeof v === 'boolean') ||
+            Object.values(defaultChatbotConfig[sectionKey]).some(v => isObject(v) && Object.values(v).some(sv => typeof sv === 'boolean'))) {
+            updates[sectionKey] = {};
+            setMissingBooleans(updates[sectionKey], defaultChatbotConfig[sectionKey], sectionKey);
+        }
+    }
+  });
 
   const jsonFields = ['functionality.multiStepDialogs', 'userExperience.customInteractiveButtons'];
   for (const path of jsonFields) {
@@ -188,80 +186,66 @@ export async function action({ request }) {
 
   try {
     const saved = await saveChatbotConfig(shopId, updates);
-    if (saved) {
-      return redirect("/app/chatbot-settings"); // Let success banner show from loader data after redirect
-    } else {
-      return json({ error: "Failed to save settings due to a server error." }, { status: 500 });
-    }
-  } catch (error) {
-    console.error("Error in action saving config:", error);
-    return json({ error: "An unexpected error occurred while saving settings." }, { status: 500 });
-  }
+    if (saved) { return redirect("/app/chatbot-settings"); }
+    else { return json({ error: "Failed to save settings." }, { status: 500 }); }
+  } catch (error) { return json({ error: "Error saving settings." }, { status: 500 }); }
 }
 
 export default function ChatbotSettingsPage() {
   const { config: initialConfig, shopId, apiKey, promptOptions, error: loaderErrorMsg } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
-  const formRef = useRef(null);
   const navigate = useNavigate();
 
   const getInitial = (path, defaultValue = '') => getNestedValue(initialConfig, path) ?? defaultValue;
   const getInitialBoolean = (path, defaultValue = false) => getNestedValue(initialConfig, path) ?? defaultValue;
   const getInitialJsonString = (path, defaultValue = []) => JSON.stringify(getNestedValue(initialConfig, path) ?? defaultValue, null, 2);
 
-  const [chatboxBackgroundColor, setChatboxBackgroundColor] = useState(getInitial('appearance.chatboxBackgroundColor'));
-  const [chatboxBorderColor, setChatboxBorderColor] = useState(getInitial('appearance.chatboxBorderColor'));
-  const [chatboxBorderRadius, setChatboxBorderRadius] = useState(getInitial('appearance.chatboxBorderRadius'));
-  const [fontFamily, setFontFamily] = useState(getInitial('appearance.fontFamily'));
-  const [fontSize, setFontSize] = useState(getInitial('appearance.fontSize'));
-  const [chatboxBackgroundOpacity, setChatboxBackgroundOpacity] = useState(getInitial('appearance.chatboxBackgroundOpacity'));
-  const [userBubbleColor, setUserBubbleColor] = useState(getInitial('appearance.userBubbleColor'));
-  const [botBubbleColor, setBotBubbleColor] = useState(getInitial('appearance.botBubbleColor'));
+  const [chatbotName, setChatbotName] = useState(getInitial('functionality.chatbotName'));
+  const [functionalitySystemPrompt, setFunctionalitySystemPrompt] = useState(getInitial('functionality.systemPrompt', defaultChatbotConfig.functionality.systemPrompt));
+  const [chatboxBackgroundColor, setChatboxBackgroundColor] = useState(getInitial('appearance.chatboxBackgroundColor', defaultChatbotConfig.appearance.chatboxBackgroundColor));
+  const [chatboxBorderColor, setChatboxBorderColor] = useState(getInitial('appearance.chatboxBorderColor', defaultChatbotConfig.appearance.chatboxBorderColor));
+  const [chatboxBorderRadius, setChatboxBorderRadius] = useState(getInitial('appearance.chatboxBorderRadius', defaultChatbotConfig.appearance.chatboxBorderRadius));
+  const [fontFamily, setFontFamily] = useState(getInitial('appearance.fontFamily', defaultChatbotConfig.appearance.fontFamily));
+  const [fontSize, setFontSize] = useState(getInitial('appearance.fontSize', defaultChatbotConfig.appearance.fontSize));
+  const [chatboxBackgroundOpacity, setChatboxBackgroundOpacity] = useState(getInitial('appearance.chatboxBackgroundOpacity', defaultChatbotConfig.appearance.chatboxBackgroundOpacity));
+  const [userBubbleColor, setUserBubbleColor] = useState(getInitial('appearance.userBubbleColor', defaultChatbotConfig.appearance.userBubbleColor));
+  const [botBubbleColor, setBotBubbleColor] = useState(getInitial('appearance.botBubbleColor', defaultChatbotConfig.appearance.botBubbleColor));
   const [customLogoUrl, setCustomLogoUrl] = useState(getInitial('appearance.customLogoUrl'));
-  const [brandAccentColor, setBrandAccentColor] = useState(getInitial('appearance.brandAccentColor'));
-  const [inputFieldBackgroundColor, setInputFieldBackgroundColor] = useState(getInitial('appearance.inputFieldBackgroundColor'));
-  const [inputFieldTextColor, setInputFieldTextColor] = useState(getInitial('appearance.inputFieldTextColor'));
-  const [sendButtonStyle, setSendButtonStyle] = useState(getInitial('appearance.sendButtonStyle'));
-  const [sendButtonHoverColor, setSendButtonHoverColor] = useState(getInitial('appearance.sendButtonHoverColor'));
+  const [brandAccentColor, setBrandAccentColor] = useState(getInitial('appearance.brandAccentColor', defaultChatbotConfig.appearance.brandAccentColor));
+  const [inputFieldBackgroundColor, setInputFieldBackgroundColor] = useState(getInitial('appearance.inputFieldBackgroundColor', defaultChatbotConfig.appearance.inputFieldBackgroundColor));
+  const [inputFieldTextColor, setInputFieldTextColor] = useState(getInitial('appearance.inputFieldTextColor', defaultChatbotConfig.appearance.inputFieldTextColor));
+  const [sendButtonStyle, setSendButtonStyle] = useState(getInitial('appearance.sendButtonStyle', defaultChatbotConfig.appearance.sendButtonStyle));
+  const [sendButtonHoverColor, setSendButtonHoverColor] = useState(getInitial('appearance.sendButtonHoverColor', defaultChatbotConfig.appearance.sendButtonHoverColor));
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState(getInitial('appearance.customBackgroundUrl'));
-  const [fontWeight, setFontWeight] = useState(getInitial('appearance.fontWeight'));
-
+  const [fontWeight, setFontWeight] = useState(getInitial('appearance.fontWeight', defaultChatbotConfig.appearance.fontWeight));
   const [screenPosition, setScreenPosition] = useState(getInitial('positioning.screenPosition'));
   const [isFixed, setIsFixed] = useState(getInitialBoolean('positioning.isFixed'));
   const [popupTrigger, setPopupTrigger] = useState(getInitial('positioning.popupTrigger'));
   const [popupDelaySeconds, setPopupDelaySeconds] = useState(getInitial('positioning.popupDelaySeconds'));
-
-  const [chatbotName, setChatbotName] = useState(getInitial('functionality.chatbotName'));
   const [defaultGreetingMessage, setDefaultGreetingMessage] = useState(getInitial('functionality.defaultGreetingMessage'));
   const [fallbackMessage, setFallbackMessage] = useState(getInitial('functionality.fallbackMessage'));
   const [multiStepDialogs, setMultiStepDialogs] = useState(getInitialJsonString('functionality.multiStepDialogs'));
   const [conversationTimeoutSeconds, setConversationTimeoutSeconds] = useState(getInitial('functionality.conversationTimeoutSeconds'));
   const [idleMessage, setIdleMessage] = useState(getInitial('functionality.idleMessage'));
-  const [functionalitySystemPrompt, setFunctionalitySystemPrompt] = useState(getInitial('functionality.systemPrompt', defaultChatbotConfig.functionality.systemPrompt));
-
   const [selectedAPI, setSelectedAPI] = useState(getInitial('apiManagement.selectedAPI'));
   const [claudeAPIKey, setClaudeAPIKey] = useState(getInitial('apiManagement.claudeAPIKey'));
   const [geminiAPIKey, setGeminiAPIKey] = useState(getInitial('apiManagement.geminiAPIKey'));
   const [shopifyStoreUrl, setShopifyStoreUrl] = useState(getInitial('apiManagement.shopifyStoreUrl'));
   const [shopifyAccessToken, setShopifyAccessToken] = useState(getInitial('apiManagement.shopifyAccessToken'));
-
   const [avatarImageUrl, setAvatarImageUrl] = useState(getInitial('avatar.avatarImageUrl'));
   const [avatarShape, setAvatarShape] = useState(getInitial('avatar.avatarShape'));
   const [avatarBorderColor, setAvatarBorderColor] = useState(getInitial('avatar.avatarBorderColor'));
   const [avatarBorderSize, setAvatarBorderSize] = useState(getInitial('avatar.avatarBorderSize'));
-
   const [speechToTextEnabled, setSpeechToTextEnabled] = useState(getInitialBoolean('userExperience.speechToTextEnabled'));
   const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(getInitialBoolean('userExperience.textToSpeechEnabled'));
   const [customInteractiveButtons, setCustomInteractiveButtons] = useState(getInitialJsonString('userExperience.customInteractiveButtons'));
   const [formValidationEnabled, setFormValidationEnabled] = useState(getInitialBoolean('userExperience.formValidationEnabled'));
   const [showTypingIndicator, setShowTypingIndicator] = useState(getInitialBoolean('userExperience.showTypingIndicator'));
-
   const [endToEndEncryptionEnabled, setEndToEndEncryptionEnabled] = useState(getInitialBoolean('securityPrivacy.endToEndEncryptionEnabled'));
   const [gdprCompliant, setGdprCompliant] = useState(getInitialBoolean('securityPrivacy.gdprCompliant'));
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(getInitial('securityPrivacy.sessionTimeoutMinutes'));
   const [dataRetentionPolicyDays, setDataRetentionPolicyDays] = useState(getInitial('securityPrivacy.dataRetentionPolicyDays'));
-
   const [displayFormat, setDisplayFormat] = useState(getInitial('productDisplay.displayFormat'));
   const [productImageSize, setProductImageSize] = useState(getInitial('productDisplay.productImageSize'));
   const [productsPerRow, setProductsPerRow] = useState(getInitial('productDisplay.productsPerRow'));
@@ -270,7 +254,6 @@ export default function ChatbotSettingsPage() {
   const [showDescription, setShowDescription] = useState(getInitialBoolean('productDisplay.showDescription'));
   const [defaultSortOrder, setDefaultSortOrder] = useState(getInitial('productDisplay.defaultSortOrder'));
   const [addToCartButtonEnabled, setAddToCartButtonEnabled] = useState(getInitialBoolean('productDisplay.addToCartButtonEnabled'));
-
   const [trackAddToCart, setTrackAddToCart] = useState(getInitialBoolean('analytics.trackAddToCart'));
   const [trackCheckoutInitiation, setTrackCheckoutInitiation] = useState(getInitialBoolean('analytics.trackCheckoutInitiation'));
   const [trackProductInteractions, setTrackProductInteractions] = useState(getInitialBoolean('analytics.trackProductInteractions'));
@@ -279,6 +262,8 @@ export default function ChatbotSettingsPage() {
   const [trackUserFeedback, setTrackUserFeedback] = useState(getInitialBoolean('analytics.trackUserFeedback'));
 
   useEffect(() => {
+    setChatbotName(getInitial('functionality.chatbotName'));
+    setFunctionalitySystemPrompt(getInitial('functionality.systemPrompt', defaultChatbotConfig.functionality.systemPrompt));
     setChatboxBackgroundColor(getInitial('appearance.chatboxBackgroundColor'));
     setChatboxBorderColor(getInitial('appearance.chatboxBorderColor'));
     setChatboxBorderRadius(getInitial('appearance.chatboxBorderRadius'));
@@ -299,13 +284,11 @@ export default function ChatbotSettingsPage() {
     setIsFixed(getInitialBoolean('positioning.isFixed'));
     setPopupTrigger(getInitial('positioning.popupTrigger'));
     setPopupDelaySeconds(getInitial('positioning.popupDelaySeconds'));
-    setChatbotName(getInitial('functionality.chatbotName'));
     setDefaultGreetingMessage(getInitial('functionality.defaultGreetingMessage'));
     setFallbackMessage(getInitial('functionality.fallbackMessage'));
     setMultiStepDialogs(getInitialJsonString('functionality.multiStepDialogs'));
     setConversationTimeoutSeconds(getInitial('functionality.conversationTimeoutSeconds'));
     setIdleMessage(getInitial('functionality.idleMessage'));
-    setFunctionalitySystemPrompt(getInitial('functionality.systemPrompt', defaultChatbotConfig.functionality.systemPrompt));
     setSelectedAPI(getInitial('apiManagement.selectedAPI'));
     setClaudeAPIKey(getInitial('apiManagement.claudeAPIKey'));
     setGeminiAPIKey(getInitial('apiManagement.geminiAPIKey'));
@@ -368,7 +351,7 @@ export default function ChatbotSettingsPage() {
       'functionality.multiStepDialogs': multiStepDialogs,
       'functionality.conversationTimeoutSeconds': String(conversationTimeoutSeconds),
       'functionality.idleMessage': idleMessage,
-      'functionality.systemPrompt': functionalitySystemPrompt,
+      'functionality.systemPrompt': functionalitySystemPrompt, // Added
       'apiManagement.selectedAPI': selectedAPI,
       'apiManagement.claudeAPIKey': claudeAPIKey,
       'apiManagement.geminiAPIKey': geminiAPIKey,
@@ -416,7 +399,7 @@ export default function ChatbotSettingsPage() {
   }, [
     chatboxBackgroundColor, chatboxBorderColor, chatboxBorderRadius, fontFamily, fontSize, fontWeight, chatboxBackgroundOpacity, userBubbleColor, botBubbleColor, inputFieldBackgroundColor, inputFieldTextColor, sendButtonStyle, sendButtonHoverColor, customLogoUrl, customBackgroundUrl, brandAccentColor,
     screenPosition, isFixed, popupTrigger, popupDelaySeconds,
-    chatbotName, defaultGreetingMessage, fallbackMessage, multiStepDialogs, conversationTimeoutSeconds, idleMessage, functionalitySystemPrompt,
+    chatbotName, defaultGreetingMessage, fallbackMessage, multiStepDialogs, conversationTimeoutSeconds, idleMessage, functionalitySystemPrompt, // Added
     selectedAPI, claudeAPIKey, geminiAPIKey, shopifyStoreUrl, shopifyAccessToken,
     avatarImageUrl, avatarShape, avatarBorderColor, avatarBorderSize,
     speechToTextEnabled, textToSpeechEnabled, customInteractiveButtons, formValidationEnabled, showTypingIndicator,
@@ -426,20 +409,10 @@ export default function ChatbotSettingsPage() {
     submit
   ]);
 
-  const dismissBanner = () => {
-    navigate('/app/chatbot-settings', { replace: true });
-  };
+  const dismissBanner = () => { navigate('/app/chatbot-settings', { replace: true }); };
 
   if (!initialConfig || Object.keys(initialConfig).length === 0 && !loaderErrorMsg) {
-      return (
-          <Page title="Chatbot Configuration">
-              <Frame>
-                  <EmptyState heading="Configuration Unavailable" image="https://cdn.shopify.com/s/files/1/0262/4074/files/empty-state.svg">
-                      <p>There was an issue loading the chatbot settings. Default settings may not be available. Please try again later.</p>
-                  </EmptyState>
-              </Frame>
-          </Page>
-      );
+      return ( <Page title="Chatbot Configuration"><Frame><EmptyState heading="Configuration Unavailable"><p>Error loading settings.</p></EmptyState></Frame></Page> );
   }
 
   return (
@@ -449,9 +422,9 @@ export default function ChatbotSettingsPage() {
         {actionData?.success && <Banner title="Success" status="success" onDismiss={dismissBanner}>{actionData.message}</Banner>}
         {actionData?.error && <Banner title="Error" status="critical" onDismiss={dismissBanner}>{actionData.error}</Banner>}
 
-        <Form ref={formRef} onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <Form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
           <Layout>
-            {/* ... (Appearance Card and other sections) ... */}
+            {/* --- Appearance Card --- */}
             <Layout.Section>
               <Card>
                 <BlockStack gap="500" padding="400">
@@ -517,21 +490,15 @@ export default function ChatbotSettingsPage() {
                         onChange={useCallback(setMultiStepDialogs, [])}
                         multiline={8} // Increased line count
                         autoComplete="off"
-                        helpText={`Define structured conversation flows as a JSON array. Each object in the array represents a dialog. Example:
+                        helpText={`Define structured conversation flows as a JSON array. Example:
 [
   {
     "id": "dialog_1",
     "triggerIntent": "intent_name",
     "initialStepId": "step_1_1",
     "steps": [
-      {
-        "id": "step_1_1", "message": "Bot message 1", "expectedInputType": "text", "variableName": "var1", "nextStepId": "step_1_2"
-      },
-      {
-        "id": "step_1_2", "message": "Bot message 2 (uses {var1})", "expectedInputType": "options",
-        "options": [{"text": "Option A", "payload": "payload_a", "nextStepId": "step_1_3_a"}],
-        "variableName": "var2"
-      }
+      {"id": "step_1_1", "message": "Bot message 1", "expectedInputType": "text", "variableName": "var1", "nextStepId": "step_1_2"},
+      {"id": "step_1_2", "message": "Bot message 2 (uses {var1})", "expectedInputType": "options", "options": [{"text": "Option A", "payload": "payload_a", "nextStepId": "step_1_3_a"}], "variableName": "var2"}
     ]
   }
 ]`}
@@ -566,7 +533,6 @@ export default function ChatbotSettingsPage() {
               </Card>
             </Layout.Section>
 
-            {/* --- Avatar Card --- */}
             <Layout.Section>
               <Card>
                 <BlockStack gap="500" padding="400">
@@ -581,7 +547,6 @@ export default function ChatbotSettingsPage() {
               </Card>
             </Layout.Section>
 
-            {/* --- User Experience Card --- */}
             <Layout.Section>
                 <Card>
                     <BlockStack gap="500" padding="400">
@@ -597,7 +562,6 @@ export default function ChatbotSettingsPage() {
                 </Card>
             </Layout.Section>
 
-            {/* --- Product Display Card --- */}
             <Layout.Section>
                 <Card>
                     <BlockStack gap="500" padding="400">
@@ -616,7 +580,6 @@ export default function ChatbotSettingsPage() {
                 </Card>
             </Layout.Section>
 
-            {/* --- Analytics Card --- */}
             <Layout.Section>
                 <Card>
                     <BlockStack gap="500" padding="400">
@@ -633,7 +596,6 @@ export default function ChatbotSettingsPage() {
                 </Card>
             </Layout.Section>
 
-            {/* --- Security & Privacy Card --- */}
             <Layout.Section>
                 <Card>
                     <BlockStack gap="500" padding="400">
@@ -660,5 +622,3 @@ export default function ChatbotSettingsPage() {
     </Page>
   );
 }
-
-[end of app/routes/app.chatbot-settings.jsx]
