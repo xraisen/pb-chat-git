@@ -9,6 +9,7 @@ import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server.js"; // Ensure .js if that's the actual filename
 import { createGeminiService } from "../services/gemini.server.js";
+import { getAppConfiguration } from "../db.server.js"; // Added import
 import { createToolService } from "../services/tool.server";
 import { unauthenticated } from "../shopify.server";
 
@@ -128,21 +129,68 @@ async function handleChatSession({
   userMessage,
   conversationId,
   promptType,
-  llmProvider, // Added llmProvider
+  llmProvider, // This is body.llm_provider, used as a fallback/preference
   stream
 }) {
-  // Initialize services based on llm_provider
-  let llmService;
-  if (llmProvider === 'gemini') {
-    llmService = createGeminiService();
-  } else {
-    llmService = createClaudeService();
+  const shopDomain = request.headers.get("Origin"); // Assuming this is a reliable way to get shop domain for config
+  if (!shopDomain) {
+    stream.sendMessage({ type: 'error', error: { message: "Shop domain could not be determined." } });
+    stream.sendMessage({ type: 'end_turn' });
+    return;
   }
+
+  const appConfig = await getAppConfiguration(shopDomain);
+
+  let selectedLlmProvider = null;
+  let apiKey = null;
+
+  // 1. Admin settings take precedence
+  if (appConfig?.llmProvider) {
+    selectedLlmProvider = appConfig.llmProvider;
+    if (selectedLlmProvider === "gemini" && appConfig.geminiApiKey) {
+      apiKey = appConfig.geminiApiKey;
+    } else if (selectedLlmProvider === "claude" && appConfig.claudeApiKey) {
+      apiKey = appConfig.claudeApiKey;
+    }
+  }
+
+  // 2. Request body override/fallback (if admin provider preference didn't yield a key)
+  //    or if admin hasn't set a preferred provider but has stored keys.
+  if (!apiKey) {
+    const requestLlmProvider = llmProvider; // llmProvider is body.llm_provider from handleChatRequest
+    if (requestLlmProvider === "gemini" && appConfig?.geminiApiKey) {
+      selectedLlmProvider = "gemini";
+      apiKey = appConfig.geminiApiKey;
+    } else if (requestLlmProvider === "claude" && appConfig?.claudeApiKey) {
+      selectedLlmProvider = "claude";
+      apiKey = appConfig.claudeApiKey;
+    }
+  }
+
+  // 3. If still no apiKey, and admin had a preferred provider, it means the key for that provider is missing.
+  if (!apiKey && appConfig?.llmProvider) {
+    console.error(`Admin preferred LLM provider (${appConfig.llmProvider}) is set for ${shopDomain}, but its API key is missing or invalid.`);
+    // We will fall through to the general error "LLM provider or API key is not configured correctly."
+  }
+
+
+  let llmService;
+  if (selectedLlmProvider === "gemini" && apiKey) {
+    llmService = createGeminiService(apiKey);
+  } else if (selectedLlmProvider === "claude" && apiKey) {
+    llmService = createClaudeService(apiKey);
+  } else {
+    console.error(`LLM provider or API key is not configured correctly for shop ${shopDomain}. Admin Provider: ${appConfig?.llmProvider}, Request Provider: ${llmProvider}`);
+    stream.sendMessage({ type: 'error', error: { message: "LLM provider or API key is not configured correctly. Please check admin settings." } });
+    stream.sendMessage({ type: 'end_turn' });
+    return;
+  }
+
   const toolService = createToolService();
 
   // Initialize MCP client
   const shopId = request.headers.get("X-Shopify-Shop-Id");
-  const shopDomain = request.headers.get("Origin");
+  // shopDomain is already defined above
   const customerMcpEndpoint = await getCustomerMcpEndpoint(shopDomain, conversationId);
   const mcpClient = new MCPClient(
     shopDomain,
@@ -193,7 +241,7 @@ async function handleChatSession({
     });
 
     // Execute the conversation stream
-    // Execute the conversation stream with Gemini
+    // Execute the conversation stream
     // The streamGeminiConversation is designed to directly use stream.sendMessage
     // for SSE events like 'chunk', 'id', 'message_complete', 'error', 'end_turn'.
     // It does not use onText, onMessage, onToolUse callbacks in the same way Claude SDK did.
@@ -269,10 +317,10 @@ async function handleChatSession({
       }
     };
 
-    if (llmProvider === 'gemini') {
+    if (selectedLlmProvider === 'gemini') { // Use selectedLlmProvider
       await llmService.streamGeminiConversation(
         {
-          messages: conversationHistory, // Pass current history (Claude format)
+          messages: conversationHistory,
           promptType,
           tools: mcpClient.tools,
           conversationId
@@ -310,10 +358,9 @@ async function handleChatSession({
         // The critical part is that `gemini.server.js` will add the functionResponse part.
 
         await llmService.streamGeminiResponseAfterToolExecution({
-          // apiKey: process.env.GEMINI_API_KEY, // Service uses its own env var
           existingMessages: conversationHistory, // Pass the history that led to the tool call + the tool call itself
           toolName: toolName,
-          toolResponse: toolExecutionResult, // The actual result or error object
+            toolResponse: toolExecutionResult,
           streamHandlers: { sendMessage: stream.sendMessage }, // Use wrapped to continue streaming
           conversationId
         });
@@ -383,8 +430,8 @@ async function handleChatSession({
     stream.sendMessage = originalSendMessage; // Restore original sendMessage
 
   } catch (error) {
-    console.error(`[handleChatSession] Error during ${llmProvider} conversation:`, error);
-    stream.sendMessage({ type: 'error', error: { message: error.message || `Chat session failed with ${llmProvider}.` } });
+    console.error(`[handleChatSession] Error during ${selectedLlmProvider || llmProvider} conversation:`, error);
+    stream.sendMessage({ type: 'error', error: { message: error.message || `Chat session failed with ${selectedLlmProvider || llmProvider}.` } });
     stream.sendMessage({ type: 'end_turn' });
   }
 }

@@ -6,6 +6,129 @@ if (process.env.NODE_ENV !== "production") {
   }
 }
 
+// Encryption/Decryption helpers
+import crypto from 'crypto';
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "DefaultEncryptionKeyPlaceholder32Chars"; // Must be 32 characters for AES-256
+const ALGORITHM = 'aes-256-cbc';
+
+if (ENCRYPTION_KEY === "DefaultEncryptionKeyPlaceholder32Chars") {
+  console.warn("Warning: Using default encryption key. Set ENCRYPTION_KEY environment variable for production.");
+}
+if (Buffer.from(ENCRYPTION_KEY).length !== 32) {
+    throw new Error("ENCRYPTION_KEY must be 32 bytes long for aes-256-cbc.");
+}
+
+function encrypt(text) {
+  if (text == null || text === '') return null;
+  try {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+  } catch (error) {
+    console.error("Encryption failed:", error);
+    // Depending on policy, you might want to return null, throw, or return the original text
+    return null;
+  }
+}
+
+function decrypt(text) {
+  if (text == null || text === '') return null;
+  try {
+    const textParts = text.split(':');
+    if (textParts.length !== 2) {
+      console.error("Decryption failed: Invalid format. Expected iv:encryptedData");
+      return null;
+    }
+    const iv = Buffer.from(textParts.shift(), 'hex');
+    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+  } catch (error) {
+    console.error("Decryption failed:", error);
+    // It's common to return null if decryption fails, e.g. due to wrong key or corrupt data
+    return null;
+  }
+}
+
+export async function getAppConfiguration(shop) {
+  if (!shop) {
+    console.error("getAppConfiguration: shop parameter is required");
+    return null; // Or throw an error
+  }
+  try {
+    const config = await prisma.appConfiguration.findUnique({
+      where: { shop },
+    });
+
+    if (config) {
+      return {
+        ...config,
+        geminiApiKey: decrypt(config.geminiApiKey),
+        claudeApiKey: decrypt(config.claudeApiKey),
+      };
+    }
+    return { llmProvider: null, geminiApiKey: null, claudeApiKey: null, shop }; // Default structure if not found
+  } catch (error) {
+    console.error(`Error fetching app configuration for shop ${shop}:`, error);
+    // Consider what to return in case of error: null, default object, or throw
+    return { llmProvider: null, geminiApiKey: null, claudeApiKey: null, shop, error: "Failed to fetch configuration" };
+  }
+}
+
+export async function updateAppConfiguration(shop, data) {
+  if (!shop) {
+    console.error("updateAppConfiguration: shop parameter is required");
+    throw new Error("Shop parameter is required for updating configuration.");
+  }
+  if (!data) {
+    console.error("updateAppConfiguration: data parameter is required");
+    throw new Error("Data parameter is required for updating configuration.");
+  }
+
+  const { llmProvider, geminiApiKey, claudeApiKey } = data;
+  const encryptedData = {};
+
+  if (llmProvider !== undefined) encryptedData.llmProvider = llmProvider;
+
+  // Encrypt API keys only if they are provided as non-empty strings
+  if (geminiApiKey && typeof geminiApiKey === 'string') {
+    encryptedData.geminiApiKey = encrypt(geminiApiKey);
+  } else if (geminiApiKey === '' || geminiApiKey === null) {
+    encryptedData.geminiApiKey = null; // Explicitly set to null if cleared
+  }
+
+  if (claudeApiKey && typeof claudeApiKey === 'string') {
+    encryptedData.claudeApiKey = encrypt(claudeApiKey);
+  } else if (claudeApiKey === '' || claudeApiKey === null) {
+    encryptedData.claudeApiKey = null; // Explicitly set to null if cleared
+  }
+
+  try {
+    const result = await prisma.appConfiguration.upsert({
+      where: { shop },
+      update: encryptedData,
+      create: {
+        shop,
+        ...encryptedData, // llmProvider might be undefined here, prisma handles it
+      },
+    });
+    // Return decrypted data for consistency, or the raw result if preferred
+    return {
+        ...result,
+        geminiApiKey: decrypt(result.geminiApiKey),
+        claudeApiKey: decrypt(result.claudeApiKey),
+    };
+  } catch (error) {
+    console.error(`Error updating app configuration for shop ${shop}:`, error);
+    throw error; // Re-throw the error to be handled by the caller
+  }
+}
+
 const prisma = global.prismaGlobal ?? new PrismaClient();
 
 export default prisma;
