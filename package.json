@@ -59,7 +59,7 @@
     "prettier": "^3.2.4",
     "prisma": "^6.8.2",
     "typescript": "^5.2.2",
-    "vite": "^6.2.2"
+    "vite": "^5.1.0"
   },
   "workspaces": [
     "extensions/*"
