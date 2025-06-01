@@ -510,7 +510,32 @@ export default function ChatbotSettingsPage() {
                     <TextField label="Fallback Message (if bot doesn't understand)" name="functionality.fallbackMessage" value={fallbackMessage} onChange={useCallback(setFallbackMessage, [])} multiline={3} autoComplete="off" />
                     <TextField label="Idle Message (if user inactive)" name="functionality.idleMessage" value={idleMessage} onChange={useCallback(setIdleMessage, [])} multiline={2} autoComplete="off" />
                     <TextField label="Conversation Timeout (seconds)" name="functionality.conversationTimeoutSeconds" type="number" value={conversationTimeoutSeconds} onChange={useCallback((val) => setConversationTimeoutSeconds(parseFloat(val)), [])} autoComplete="off" />
-                    <TextField label="Multi-Step Dialogs (JSON format)" name="functionality.multiStepDialogs" value={multiStepDialogs} onChange={useCallback(setMultiStepDialogs, [])} multiline={5} autoComplete="off" helpText="Define complex conversation flows as a JSON array." />
+                    <TextField
+                        label="Multi-Step Dialogs (JSON format)"
+                        name="functionality.multiStepDialogs"
+                        value={multiStepDialogs}
+                        onChange={useCallback(setMultiStepDialogs, [])}
+                        multiline={8} // Increased line count
+                        autoComplete="off"
+                        helpText={`Define structured conversation flows as a JSON array. Each object in the array represents a dialog. Example:
+[
+  {
+    "id": "dialog_1",
+    "triggerIntent": "intent_name",
+    "initialStepId": "step_1_1",
+    "steps": [
+      {
+        "id": "step_1_1", "message": "Bot message 1", "expectedInputType": "text", "variableName": "var1", "nextStepId": "step_1_2"
+      },
+      {
+        "id": "step_1_2", "message": "Bot message 2 (uses {var1})", "expectedInputType": "options",
+        "options": [{"text": "Option A", "payload": "payload_a", "nextStepId": "step_1_3_a"}],
+        "variableName": "var2"
+      }
+    ]
+  }
+]`}
+                    />
                     <Select
                         label="System Prompt (Personality)"
                         name="functionality.systemPrompt"
