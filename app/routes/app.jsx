@@ -24,6 +24,9 @@ export default function App() {
         </Link>
       </NavMenu>
       <Outlet />
+      <footer style={{ textAlign: 'center', padding: '20px' }}>
+        Develop with ❤️ by Jose
+      </footer>
     </AppProvider>
   );
 }
