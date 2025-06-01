@@ -85,7 +85,7 @@ model ShopChatbotConfig {
   shop                    String    @unique
 
   // LLM and API Key settings (existing)
-  llmProvider             String?
+  llmProvider             String?   @default("gemini")
   geminiApiKey            String? // Encrypted
   claudeApiKey            String? // Encrypted
 
