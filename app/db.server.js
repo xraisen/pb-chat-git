@@ -63,6 +63,8 @@ const defaultShopChatbotConfig = {
   welcomeMessage: "👋 Hi there! How can I help you today?",
   systemPromptKey: "standardAssistant",
   customSystemPrompt: null,
+  promptHeadOverride: null, // Added
+  promptTailOverride: null, // Added
   // UTM Default Values
   utmSource: null,
   utmMedium: null,
@@ -134,7 +136,7 @@ export async function updateShopChatbotConfig(shop, data) {
   // This ensures that even if a field is not in `data`, it doesn't become `undefined` if Prisma expects a value or null.
   const {
     llmProvider, geminiApiKey, claudeApiKey,
-    botName, welcomeMessage, systemPromptKey, customSystemPrompt,
+    botName, welcomeMessage, systemPromptKey, customSystemPrompt, promptHeadOverride, promptTailOverride,
     // UTM Params
     utmSource, utmMedium, utmCampaign, utmTerm, utmContent,
     // UI Params
@@ -156,6 +158,8 @@ export async function updateShopChatbotConfig(shop, data) {
     welcomeMessage: welcomeMessage !== undefined ? welcomeMessage : defaultShopChatbotConfig.welcomeMessage,
     systemPromptKey: systemPromptKey !== undefined ? systemPromptKey : defaultShopChatbotConfig.systemPromptKey,
     customSystemPrompt: customSystemPrompt !== undefined ? customSystemPrompt : defaultShopChatbotConfig.customSystemPrompt,
+    promptHeadOverride: promptHeadOverride !== undefined ? promptHeadOverride : defaultShopChatbotConfig.promptHeadOverride,
+    promptTailOverride: promptTailOverride !== undefined ? promptTailOverride : defaultShopChatbotConfig.promptTailOverride,
 
     // UTM Parameters
     utmSource: utmSource !== undefined ? utmSource : defaultShopChatbotConfig.utmSource,

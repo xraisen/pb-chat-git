@@ -4,14 +4,16 @@
  */
 import { json } from "@remix-run/node";
 import MCPClient from "../mcp-client";
-import { saveMessage, getConversationHistory, storeCustomerAccountUrl, getCustomerAccountUrl } from "../db.server";
+import { saveMessage, getConversationHistory, storeCustomerAccountUrl, getCustomerAccountUrl, getShopChatbotConfig } from "../db.server.js"; // getAppConfiguration changed to getShopChatbotConfig
 import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
-import { createClaudeService } from "../services/claude.server.js"; // Ensure .js if that's the actual filename
+import { createClaudeService } from "../services/claude.server.js";
 import { createGeminiService } from "../services/gemini.server.js";
-import { getAppConfiguration } from "../db.server.js"; // Added import
+// import { getAppConfiguration } from "../db.server.js"; // Replaced by getShopChatbotConfig
 import prisma from "../db.server.js"; // For logging
 import { createToolService } from "../services/tool.server";
+import fs from "fs"; // Using readFileSync for simplicity in this server-side route
+import path from "path";
 import { unauthenticated } from "../shopify.server";
 
 // Helper function to append UTM parameters to a URL
@@ -155,7 +157,8 @@ async function handleChatSession({
   // Log USER_MESSAGE_SENT_BACKEND
   // Note: conversationId might be new here if client didn't provide one.
   // The log function can handle temporary/generated IDs if needed.
-  await logChatInteraction(shopDomain, conversationId, "USER_MESSAGE_SENT_BACKEND", { messageLength: userMessage.length, promptType });
+  // promptType here is from the client request, used as a fallback if no specific config
+  await logChatInteraction(shopDomain, conversationId, "USER_MESSAGE_SENT_BACKEND", { messageLength: userMessage.length, requestedPromptType: promptType });
 
 
   if (!shopDomain) {
@@ -164,7 +167,47 @@ async function handleChatSession({
     return;
   }
 
-  const appConfig = await getShopChatbotConfig(shopDomain); // Renamed during previous step
+  const appConfig = await getShopChatbotConfig(shopDomain);
+
+  // Construct Final System Prompt
+  let basePromptContent = '';
+  if (appConfig && appConfig.customSystemPrompt && appConfig.customSystemPrompt.trim() !== "") {
+    basePromptContent = appConfig.customSystemPrompt;
+    logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_CUSTOM", { length: basePromptContent.length });
+  } else {
+    let keyToUse = AppConfig.api.defaultPromptType;
+    if (appConfig && appConfig.systemPromptKey) {
+      keyToUse = appConfig.systemPromptKey;
+    }
+    try {
+      const promptsFilePath = path.join(process.cwd(), "app", "prompts", "prompts.json");
+      const promptsJson = JSON.parse(fs.readFileSync(promptsFilePath, "utf-8"));
+      if (promptsJson.systemPrompts && promptsJson.systemPrompts[keyToUse] && promptsJson.systemPrompts[keyToUse].content) {
+        basePromptContent = promptsJson.systemPrompts[keyToUse].content;
+        logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_PREDEFINED", { key: keyToUse });
+      } else {
+        console.warn(`System prompt key "${keyToUse}" not found in prompts.json. Using content of defaultPromptType if available.`);
+        if (promptsJson.systemPrompts && promptsJson.systemPrompts[AppConfig.api.defaultPromptType] && promptsJson.systemPrompts[AppConfig.api.defaultPromptType].content) {
+           basePromptContent = promptsJson.systemPrompts[AppConfig.api.defaultPromptType].content;
+           logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_DEFAULT_KEY", { key: AppConfig.api.defaultPromptType });
+        } else {
+           console.error(`Default system prompt key "${AppConfig.api.defaultPromptType}" also not found in prompts.json! Using hardcoded fallback.`);
+           basePromptContent = "You are a helpful assistant.";
+           logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_HARDCODED_FALLBACK");
+        }
+      }
+    } catch (e) {
+      console.error("Error loading or parsing prompts.json:", e);
+      basePromptContent = "You are a helpful assistant."; // Ultimate fallback on error
+      logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_ERROR_FALLBACK", { error: e.message });
+    }
+  }
+
+  const headOverride = (appConfig && appConfig.promptHeadOverride) ? appConfig.promptHeadOverride.trim() + "\n\n" : "";
+  const tailOverride = (appConfig && appConfig.promptTailOverride) ? "\n\n" + appConfig.promptTailOverride.trim() : "";
+  const finalSystemPrompt = `${headOverride}${basePromptContent}${tailOverride}`;
+  // End System Prompt Construction
+
 
   const utmParamsConfig = {
     utm_source: appConfig?.utmSource,
@@ -362,11 +405,12 @@ async function handleChatSession({
       await llmService.streamGeminiConversation(
         {
           messages: conversationHistory,
-          promptType,
+          systemInstruction: finalSystemPrompt, // Pass constructed prompt
+          // promptType, // Remove if systemInstruction replaces its role, or keep if used differently
           tools: mcpClient.tools,
           conversationId
         },
-        { sendMessage: stream.sendMessage } // Use wrapped sendMessage
+        { sendMessage: stream.sendMessage }
       );
 
       // After the initial stream, check if a tool call was signaled by the wrapper
@@ -414,13 +458,14 @@ async function handleChatSession({
         });
       }
     } else { // Claude provider
-      await llmService.streamConversation( // Claude's service
+      await llmService.streamConversation(
         {
           messages: conversationHistory,
-          promptType,
+          systemInstruction: finalSystemPrompt, // Pass constructed prompt
+          // promptType, // Remove if systemInstruction replaces its role
           tools: mcpClient.tools
         },
-        { // Claude's specific handlers
+        {
           onText: (textDelta) => {
             stream.sendMessage({ type: 'chunk', chunk: textDelta });
           },
