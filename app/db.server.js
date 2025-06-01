@@ -55,76 +55,147 @@ function decrypt(text) {
   }
 }
 
-export async function getAppConfiguration(shop) {
+const defaultShopChatbotConfig = {
+  llmProvider: null,
+  geminiApiKey: null,
+  claudeApiKey: null,
+  botName: "Store Assistant",
+  welcomeMessage: "👋 Hi there! How can I help you today?",
+  systemPromptKey: "standardAssistant",
+  customSystemPrompt: null,
+  width: "450px",
+  height: "70vh",
+  zIndex: "9999",
+  position: "right",
+  bgColor: "#FFFFFF",
+  textColor: "#333333",
+  buttonColor: "#E57399",
+  headerBgColor: "#E57399",
+  headerTextColor: "#FFFFFF",
+  userMsgBgColor: "#E57399",
+  userMsgTextColor: "#FFFFFF",
+  assistantMsgBgColor: "#F8F9FA",
+  assistantMsgTextColor: "#333333",
+  customCSS: null,
+  avatarUrl: null,
+  productDisplayMode: "card",
+  maxProductsToDisplay: 3,
+  carouselItemWidth: "180px",
+  chatBubbleIcon: "default",
+  customChatBubbleSVG: null,
+  chatBubbleSize: "60px",
+  chatBubbleColor: "#E57399",
+};
+
+export async function getShopChatbotConfig(shop) {
   if (!shop) {
-    console.error("getAppConfiguration: shop parameter is required");
-    return null; // Or throw an error
+    console.error("getShopChatbotConfig: shop parameter is required");
+    return { ...defaultShopChatbotConfig, shop, error: "Shop parameter is required" };
   }
   try {
-    const config = await prisma.appConfiguration.findUnique({
+    const config = await prisma.shopChatbotConfig.findUnique({
       where: { shop },
     });
 
     if (config) {
       return {
+        ...defaultShopChatbotConfig, // Ensures all fields are present
         ...config,
         geminiApiKey: decrypt(config.geminiApiKey),
         claudeApiKey: decrypt(config.claudeApiKey),
       };
     }
-    return { llmProvider: null, geminiApiKey: null, claudeApiKey: null, shop }; // Default structure if not found
+    // If no config exists, return all default values along with the shop
+    return { ...defaultShopChatbotConfig, shop };
   } catch (error) {
-    console.error(`Error fetching app configuration for shop ${shop}:`, error);
-    // Consider what to return in case of error: null, default object, or throw
-    return { llmProvider: null, geminiApiKey: null, claudeApiKey: null, shop, error: "Failed to fetch configuration" };
+    console.error(`Error fetching ShopChatbotConfig for shop ${shop}:`, error);
+    return { ...defaultShopChatbotConfig, shop, error: "Failed to fetch configuration" };
   }
 }
 
-export async function updateAppConfiguration(shop, data) {
+export async function updateShopChatbotConfig(shop, data) {
   if (!shop) {
-    console.error("updateAppConfiguration: shop parameter is required");
+    console.error("updateShopChatbotConfig: shop parameter is required");
     throw new Error("Shop parameter is required for updating configuration.");
   }
   if (!data) {
-    console.error("updateAppConfiguration: data parameter is required");
+    console.error("updateShopChatbotConfig: data parameter is required");
     throw new Error("Data parameter is required for updating configuration.");
   }
 
-  const { llmProvider, geminiApiKey, claudeApiKey } = data;
-  const encryptedData = {};
+  // Destructure all expected fields from data, providing defaults for undefined optional fields
+  // This ensures that even if a field is not in `data`, it doesn't become `undefined` if Prisma expects a value or null.
+  const {
+    llmProvider, geminiApiKey, claudeApiKey,
+    botName, welcomeMessage, systemPromptKey, customSystemPrompt,
+    width, height, zIndex, position, bgColor, textColor, buttonColor,
+    headerBgColor, headerTextColor, userMsgBgColor, userMsgTextColor,
+    assistantMsgBgColor, assistantMsgTextColor, customCSS, avatarUrl,
+    productDisplayMode, maxProductsToDisplay, carouselItemWidth,
+    chatBubbleIcon, customChatBubbleSVG, chatBubbleSize, chatBubbleColor
+  } = data;
 
-  if (llmProvider !== undefined) encryptedData.llmProvider = llmProvider;
+  const dataToUpsert = {
+    // LLM and API Keys
+    llmProvider: llmProvider !== undefined ? llmProvider : null,
+    geminiApiKey: (geminiApiKey && typeof geminiApiKey === 'string') ? encrypt(geminiApiKey) : (geminiApiKey === '' || geminiApiKey === null ? null : undefined),
+    claudeApiKey: (claudeApiKey && typeof claudeApiKey === 'string') ? encrypt(claudeApiKey) : (claudeApiKey === '' || claudeApiKey === null ? null : undefined),
 
-  // Encrypt API keys only if they are provided as non-empty strings
-  if (geminiApiKey && typeof geminiApiKey === 'string') {
-    encryptedData.geminiApiKey = encrypt(geminiApiKey);
-  } else if (geminiApiKey === '' || geminiApiKey === null) {
-    encryptedData.geminiApiKey = null; // Explicitly set to null if cleared
-  }
+    // Chatbot Persona & Behavior
+    botName: botName !== undefined ? botName : defaultShopChatbotConfig.botName,
+    welcomeMessage: welcomeMessage !== undefined ? welcomeMessage : defaultShopChatbotConfig.welcomeMessage,
+    systemPromptKey: systemPromptKey !== undefined ? systemPromptKey : defaultShopChatbotConfig.systemPromptKey,
+    customSystemPrompt: customSystemPrompt !== undefined ? customSystemPrompt : defaultShopChatbotConfig.customSystemPrompt,
 
-  if (claudeApiKey && typeof claudeApiKey === 'string') {
-    encryptedData.claudeApiKey = encrypt(claudeApiKey);
-  } else if (claudeApiKey === '' || claudeApiKey === null) {
-    encryptedData.claudeApiKey = null; // Explicitly set to null if cleared
-  }
+    // Chat Widget Appearance & Positioning
+    width: width !== undefined ? width : defaultShopChatbotConfig.width,
+    height: height !== undefined ? height : defaultShopChatbotConfig.height,
+    zIndex: zIndex !== undefined ? zIndex : defaultShopChatbotConfig.zIndex,
+    position: position !== undefined ? position : defaultShopChatbotConfig.position,
+    bgColor: bgColor !== undefined ? bgColor : defaultShopChatbotConfig.bgColor,
+    textColor: textColor !== undefined ? textColor : defaultShopChatbotConfig.textColor,
+    buttonColor: buttonColor !== undefined ? buttonColor : defaultShopChatbotConfig.buttonColor,
+    headerBgColor: headerBgColor !== undefined ? headerBgColor : defaultShopChatbotConfig.headerBgColor,
+    headerTextColor: headerTextColor !== undefined ? headerTextColor : defaultShopChatbotConfig.headerTextColor,
+    userMsgBgColor: userMsgBgColor !== undefined ? userMsgBgColor : defaultShopChatbotConfig.userMsgBgColor,
+    userMsgTextColor: userMsgTextColor !== undefined ? userMsgTextColor : defaultShopChatbotConfig.userMsgTextColor,
+    assistantMsgBgColor: assistantMsgBgColor !== undefined ? assistantMsgBgColor : defaultShopChatbotConfig.assistantMsgBgColor,
+    assistantMsgTextColor: assistantMsgTextColor !== undefined ? assistantMsgTextColor : defaultShopChatbotConfig.assistantMsgTextColor,
+    customCSS: customCSS !== undefined ? customCSS : defaultShopChatbotConfig.customCSS,
+    avatarUrl: avatarUrl !== undefined ? avatarUrl : defaultShopChatbotConfig.avatarUrl,
+
+    // Product Display
+    productDisplayMode: productDisplayMode !== undefined ? productDisplayMode : defaultShopChatbotConfig.productDisplayMode,
+    maxProductsToDisplay: maxProductsToDisplay !== undefined ? (typeof maxProductsToDisplay === 'string' ? parseInt(maxProductsToDisplay, 10) : maxProductsToDisplay) : defaultShopChatbotConfig.maxProductsToDisplay,
+    carouselItemWidth: carouselItemWidth !== undefined ? carouselItemWidth : defaultShopChatbotConfig.carouselItemWidth,
+
+    // Chat Bubble Appearance
+    chatBubbleIcon: chatBubbleIcon !== undefined ? chatBubbleIcon : defaultShopChatbotConfig.chatBubbleIcon,
+    customChatBubbleSVG: customChatBubbleSVG !== undefined ? customChatBubbleSVG : defaultShopChatbotConfig.customChatBubbleSVG,
+    chatBubbleSize: chatBubbleSize !== undefined ? chatBubbleSize : defaultShopChatbotConfig.chatBubbleSize,
+    chatBubbleColor: chatBubbleColor !== undefined ? chatBubbleColor : defaultShopChatbotConfig.chatBubbleColor,
+  };
+
+  // Filter out undefined values from dataToUpsert to avoid Prisma errors for optional fields not being updated
+  const updatePayload = Object.fromEntries(Object.entries(dataToUpsert).filter(([_, v]) => v !== undefined));
 
   try {
-    const result = await prisma.appConfiguration.upsert({
+    const result = await prisma.shopChatbotConfig.upsert({
       where: { shop },
-      update: encryptedData,
+      update: updatePayload,
       create: {
         shop,
-        ...encryptedData, // llmProvider might be undefined here, prisma handles it
+        ...updatePayload, // Use the processed and filtered data
       },
     });
-    // Return decrypted data for consistency, or the raw result if preferred
+    // Return decrypted data for consistency
     return {
-        ...result,
+        ...result, // contains all fields from DB
         geminiApiKey: decrypt(result.geminiApiKey),
         claudeApiKey: decrypt(result.claudeApiKey),
     };
   } catch (error) {
-    console.error(`Error updating app configuration for shop ${shop}:`, error);
+    console.error(`Error updating ShopChatbotConfig for shop ${shop}:`, error);
     throw error; // Re-throw the error to be handled by the caller
   }
 }

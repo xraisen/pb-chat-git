@@ -80,12 +80,50 @@ model CustomerAccountUrl {
   updatedAt      DateTime  @updatedAt
 }
 
-model AppConfiguration {
-  id             String    @id @default(cuid())
-  shop           String    @unique
-  llmProvider    String?
-  geminiApiKey   String? // Encrypted
-  claudeApiKey   String? // Encrypted
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+model ShopChatbotConfig {
+  id                      String    @id @default(cuid())
+  shop                    String    @unique
+
+  // LLM and API Key settings (existing)
+  llmProvider             String?
+  geminiApiKey            String? // Encrypted
+  claudeApiKey            String? // Encrypted
+
+  // Chatbot Persona & Behavior
+  botName                 String?   @default("Store Assistant")
+  welcomeMessage          String?   @default("👋 Hi there! How can I help you today?")
+  systemPromptKey         String?   @default("standardAssistant") // Key for a predefined prompt
+  customSystemPrompt      String?   @db.Text // For potentially longer custom prompts
+
+  // Chat Widget Appearance & Positioning
+  width                   String?   @default("450px")
+  height                  String?   @default("70vh")
+  zIndex                  String?   @default("9999")
+  position                String?   @default("right") // e.g., "left", "right"
+  bgColor                 String?   @default("#FFFFFF")
+  textColor               String?   @default("#333333")
+  buttonColor             String?   @default("#E57399")
+  headerBgColor           String?   @default("#E57399")
+  headerTextColor         String?   @default("#FFFFFF")
+  userMsgBgColor          String?   @default("#E57399")
+  userMsgTextColor        String?   @default("#FFFFFF")
+  assistantMsgBgColor     String?   @default("#F8F9FA")
+  assistantMsgTextColor   String?   @default("#333333")
+  customCSS               String?   @db.Text
+  avatarUrl               String?   // URL to an avatar image for the assistant
+
+  // Product Display
+  productDisplayMode      String?   @default("card") // "card", "carousel", "combo"
+  maxProductsToDisplay    Int?      @default(3)
+  carouselItemWidth       String?   @default("180px")
+
+  // Chat Bubble Appearance
+  chatBubbleIcon          String?   @default("default") // "default", "question", "custom"
+  customChatBubbleSVG     String?   @db.Text // For custom SVG icon
+  chatBubbleSize          String?   @default("60px")
+  chatBubbleColor         String?   @default("#E57399")
+
+  // Timestamps (existing)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 }

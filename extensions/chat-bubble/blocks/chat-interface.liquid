@@ -32,13 +32,88 @@
 
 <script src="{{ 'chat.js' | asset_url }}" defer></script>
 <script>
+  // Initialize with Liquid block settings as fallbacks
   window.shopChatConfig = {
-    promptType: {{ block.settings.system_prompt | json }},
+    // UI related settings from block schema (will be overridden by API if successful)
+    chatBubbleColor: {{ block.settings.chat_bubble_color | json }},
     welcomeMessage: {{ block.settings.welcome_message | json }},
-    llmProvider: {{ block.settings.llm_provider | json }}
+
+    // Non-UI settings that might be relevant as fallbacks or for initial state
+    promptType: {{ block.settings.system_prompt | json }}, // Will be overridden by API's systemPromptKey
+    llmProvider: {{ block.settings.llm_provider | json }}, // API doesn't send this, server handles LLM choice
+
+    // Default values for settings expected from API, in case API fails
+    botName: "Store Assistant",
+    systemPromptKey: {{ block.settings.system_prompt | json }}, // Fallback to this if API fails
+    customSystemPrompt: "",
+    width: "450px",
+    height: "70vh",
+    zIndex: "9999",
+    position: "right",
+    bgColor: "#FFFFFF",
+    textColor: "#333333",
+    buttonColor: "#E57399",
+    headerBgColor: "#E57399",
+    headerTextColor: "#FFFFFF",
+    userMsgBgColor: "#E57399",
+    userMsgTextColor: "#FFFFFF",
+    assistantMsgBgColor: "#F8F9FA",
+    assistantMsgTextColor: "#333333",
+    customCSS: "",
+    avatarUrl: "",
+    productDisplayMode: "card",
+    maxProductsToDisplay: 3,
+    carouselItemWidth: "180px",
+    chatBubbleIcon: "default",
+    customChatBubbleSVG: "",
+    chatBubbleSize: "60px"
+    // Note: chatBubbleColor is already above from block.settings
   };
+
   window.shopId = {{ shop.id }};
-     window.shopAiApiBaseUrl = {{ app.url | json }};
+  window.shopAiApiBaseUrl = {{ app.url | json }}; // Base URL for chat API etc.
+
+  async function fetchChatConfigAndInit() {
+    const apiUrl = `{{ app.url }}/api/chat-config?shop={{ shop.myshopify_domain | url_encode }}`;
+    console.log('Shop AI Chat: Fetching config from', apiUrl);
+
+    try {
+      const response = await fetch(apiUrl);
+      if (response.ok) {
+        const apiResponse = await response.json();
+        if (apiResponse.config) {
+          // Merge fetched config. API values take precedence.
+          window.shopChatConfig = { ...window.shopChatConfig, ...apiResponse.config };
+          console.log('Shop AI Chat: Config loaded from API and merged.', window.shopChatConfig);
+        } else if (apiResponse.error) {
+          console.error('Shop AI Chat: Failed to load config from API - API Error:', apiResponse.error);
+        } else {
+          console.error('Shop AI Chat: Failed to load config from API - Unknown API issue.');
+        }
+      } else {
+        console.error('Shop AI Chat: Failed to fetch config, HTTP status:', response.status);
+      }
+    } catch (error) {
+      console.error('Shop AI Chat: Exception while fetching chat config:', error);
+    } finally {
+      // Initialize chat regardless of API success, using merged or fallback config
+      if (typeof ShopAIChat !== 'undefined' && ShopAIChat.init) {
+        ShopAIChat.init(); // ShopAIChat.init() should now use window.shopChatConfig
+        console.log('Shop AI Chat: Initialized.');
+      } else {
+        // This might happen if chat.js hasn't loaded yet.
+        // Consider a retry mechanism or ensure chat.js loads before DOMContentLoaded fully completes.
+        console.error('Shop AI Chat: ShopAIChat.init not found. Chat cannot be initialized.');
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fetchChatConfigAndInit);
+  } else {
+    // DOMContentLoaded has already fired
+    fetchChatConfigAndInit();
+  }
 </script>
 
 {% schema %}
