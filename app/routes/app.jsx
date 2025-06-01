@@ -22,6 +22,7 @@ export default function App() {
         <Link to="/app" rel="home">
           Home
         </Link>
+        <Link to="/app/settings/ai">AI Settings</Link>
       </NavMenu>
       <Outlet />
       <footer style={{ textAlign: 'center', padding: '20px' }}>

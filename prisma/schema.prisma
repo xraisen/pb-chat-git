@@ -78,3 +78,13 @@ model CustomerAccountUrl {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
+
+model AppConfiguration {
+  id             String    @id @default(cuid())
+  shop           String    @unique
+  llmProvider    String?
+  geminiApiKey   String? // Encrypted
+  claudeApiKey   String? // Encrypted
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
