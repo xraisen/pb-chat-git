@@ -144,9 +144,11 @@ export default function UISettingsPage() {
   // State for Collapsible sections
   const [isColorsOpen, setIsColorsOpen] = useState(true);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [systemPromptHelpModalOpen, setSystemPromptHelpModalOpen] = useState(false);
 
   const handleToggleColors = useCallback(() => setIsColorsOpen((open) => !open), []);
   const handleToggleAdvanced = useCallback(() => setIsAdvancedOpen((open) => !open), []);
+  const toggleSystemPromptHelpModal = useCallback(() => setSystemPromptHelpModalOpen((active) => !active), []);
 
   const handleSystemPromptChange = useCallback((value) => setSystemPromptKey(value), []);
   const handlePositionChange = useCallback((value) => setPosition(value), []);
@@ -216,6 +218,11 @@ export default function UISettingsPage() {
                           helpText="Write your detailed system prompt here. Refer to LLM documentation for best practices."
                         />
                       )}
+                       <div style={{ marginTop: 'var(--p-space-200)' }}> {/* Adjust spacing as needed */}
+                         <Button onClick={toggleSystemPromptHelpModal} variant="plain" size="slim">
+                           Learn more about system prompts
+                         </Button>
+                       </div>
                     </FormLayout.Group>
                   </FormLayout>
                 </BlockStack>
@@ -344,9 +351,43 @@ export default function UISettingsPage() {
           </Layout>
         </BlockStack>
       </RemixForm>
+      <SystemPromptHelpModal active={systemPromptHelpModalOpen} onClose={toggleSystemPromptHelpModal} />
     </Page>
   );
 }
+
+const SystemPromptHelpModal = ({ active, onClose }) => (
+  <Modal
+    open={active}
+    onClose={onClose}
+    title="Understanding System Prompts"
+    primaryAction={{ content: 'Got it!', onAction: onClose }}
+  >
+    <Modal.Section>
+      <BlockStack gap="400">
+        <PolarisText as="p">
+          The system prompt is a crucial piece of instruction you provide to the AI to guide its personality, tone, aversions, and overall behavior. It sets the context for the entire conversation.
+        </PolarisText>
+        <PolarisText as="h3" variant="headingSm">Key Considerations:</PolarisText>
+        <ul style={{margin: '0 var(--p-space-400)', paddingLeft: 'var(--p-space-400)'}}>
+          <li><strong>Clarity and Specificity:</strong> Be as clear and specific as possible. Ambiguous instructions can lead to unpredictable AI responses.</li>
+          <li><strong>Persona Definition:</strong> Define the persona you want the AI to adopt (e.g., "You are a friendly and helpful store assistant named Sparky.").</li>
+          <li><strong>Tone of Voice:</strong> Specify the desired tone (e.g., "Your tone should be enthusiastic and positive.").</li>
+          <li><strong>Task and Goals:</strong> Outline what the AI should primarily help users with (e.g., "Your main goal is to help users find products and answer questions about our store.").</li>
+          <li><strong>Constraints/Aversions:</strong> Specify what the AI should avoid doing or saying (e.g., "Do not make up product information. If you don't know an answer, say so politely.").</li>
+          <li><strong>Formatting (Optional):</strong> You can sometimes suggest how the AI should format its responses, like using bullet points for lists.</li>
+        </ul>
+        <PolarisText as="h3" variant="headingSm">Example Snippet (for a helpful clothing store assistant):</PolarisText>
+        <PolarisText as="p" tone="subdued">
+          "You are a cheerful and knowledgeable fashion advisor for 'Chic Boutique'. Your goal is to help users discover items they'll love, provide styling tips, and answer questions about materials, fit, and shipping. Always maintain a positive and encouraging tone. Do not discuss competitor pricing. If a product is out of stock, suggest similar alternatives."
+        </PolarisText>
+        <PolarisText as="p">
+          When you select "Custom" from the dropdown, you can write your own detailed prompt in the text area that appears. Experiment to find what works best for your brand!
+        </PolarisText>
+      </BlockStack>
+    </Modal.Section>
+  </Modal>
+);
                     </FormLayout.Group>
                     <FormLayout.Group title="Header Colors">
                       <TextField label="Header Background Color (Hex)" name="headerBgColor" value={headerBgColor} onChange={setHeaderBgColor} autoComplete="off" />
