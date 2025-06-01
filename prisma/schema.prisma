@@ -127,3 +127,15 @@ model ShopChatbotConfig {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 }
+
+model ChatInteractionLog {
+  id             String   @id @default(cuid())
+  shop           String   // Shop domain or ID to associate the log with the shop
+  conversationId String   // To group messages/events belonging to the same conversation
+  eventType      String   // Type of event, e.g., "CHAT_OPENED", "USER_MESSAGE_SENT", "TOOL_CALL_SEARCH_SHOP_CATALOG"
+  eventDetail    Json?    // Optional: additional details specific to the event, e.g., { productId: "...", quantity: 1 }
+  timestamp      DateTime @default(now()) // When the event occurred
+
+  @@index([shop, timestamp]) // Index for querying logs by shop and time
+  @@index([conversationId])  // Index for querying logs by conversation
+}
