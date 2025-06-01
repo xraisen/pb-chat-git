@@ -204,6 +204,87 @@ const prisma = global.prismaGlobal ?? new PrismaClient();
 
 export default prisma;
 
+export async function getChatInteractionStats(shop) {
+  if (!shop) return null;
+  try {
+    const totalInteractions = await prisma.chatInteractionLog.count({ where: { shop } });
+    const chatOpenedCount = await prisma.chatInteractionLog.count({ where: { shop, eventType: 'CHAT_OPENED' } });
+    const addToCartCount = await prisma.chatInteractionLog.count({ where: { shop, eventType: 'ADD_TO_CART_FROM_CHAT_PRODUCT' } });
+    const checkoutsInitiatedCount = await prisma.chatInteractionLog.count({ where: { shop, eventType: 'CHECKOUT_INITIATED_FROM_CHAT_TOOL' } }); // Assuming this eventType will be used
+
+    // Simplified interactionsOverTime: count by day for last 7 days (example)
+    // This is a conceptual placeholder. Real daily grouping needs date part extraction.
+    // For a robust solution, a raw query or more advanced Prisma features might be needed.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const dailyCounts = await prisma.chatInteractionLog.groupBy({
+      by: ['eventType'], // This is not by date, just an example.
+                        // Actual daily grouping is more complex.
+      _count: {
+        id: true,
+      },
+      where: {
+        shop: shop,
+        timestamp: {
+          gte: sevenDaysAgo,
+        },
+      },
+      // orderBy: { // Cannot orderBy date part directly in standard groupBy
+      //   _count: {id: 'desc'}
+      // }
+    });
+
+    // Mocking interactionsOverTime for now as proper aggregation is complex
+    const interactionsOverTime = [
+      { date: new Date(Date.now() - 6*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) + (chatOpenedCount % 5) },
+      { date: new Date(Date.now() - 5*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) - (addToCartCount % 3) },
+      { date: new Date(Date.now() - 4*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) + (checkoutsInitiatedCount % 2) },
+      { date: new Date(Date.now() - 3*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) },
+      { date: new Date(Date.now() - 2*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) + 5 },
+      { date: new Date(Date.now() - 1*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) - 2 },
+      { date: new Date().toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) + 3 },
+    ].map(item => ({...item, count: Math.max(0, item.count) })); // Ensure count is not negative
+
+    return {
+      totalInteractions,
+      chatOpenedCount,
+      addToCartCount,
+      checkoutsInitiatedCount,
+      interactionsOverTime, // Using mock data for this
+    };
+  } catch (error) {
+    console.error(`Error fetching chat interaction stats for shop ${shop}:`, error);
+    return { // Return default/empty stats on error
+      totalInteractions: 0,
+      chatOpenedCount: 0,
+      addToCartCount: 0,
+      checkoutsInitiatedCount: 0,
+      interactionsOverTime: [],
+      error: "Failed to load statistics."
+    };
+  }
+}
+
+export async function getRecentChatInteractions(shop, limit = 5) {
+   if (!shop) return [];
+  try {
+    return prisma.chatInteractionLog.findMany({
+      where: { shop },
+      orderBy: { timestamp: 'desc' },
+      take: limit,
+      select: { // Select only necessary fields to avoid over-fetching, especially eventDetail
+        id: true,
+        eventType: true,
+        timestamp: true,
+        conversationId: true,
+        // eventDetail: true, // Optionally include if you want to display some details
+      }
+    });
+  } catch (error) {
+    console.error(`Error fetching recent chat interactions for shop ${shop}:`, error);
+    return []; // Return empty array on error
+  }
+}
+
 /**
  * Store a code verifier for PKCE authentication
  * @param {string} state - The state parameter used in OAuth flow

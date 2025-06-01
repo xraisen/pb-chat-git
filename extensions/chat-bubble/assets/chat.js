@@ -1,27 +1,63 @@
 /**
  * Shop AI Chat - Client-side implementation
- *
- * This module handles the chat interface for the Shopify AI Chat application.
- * It manages the UI interactions, API communication, and message rendering.
  */
 (function() {
   'use strict';
 
-  // console.log("Initial window.shopAiApiBaseUrl:", typeof window.shopAiApiBaseUrl !== 'undefined' ? window.shopAiApiBaseUrl : "NOT DEFINED");
-
-  // let determinedApiBaseUrl = 'https://pb-chat-git.vercel.app'; // Default to Vercel URL
-  // if (typeof window.shopAiApiBaseUrl === 'string' && window.shopAiApiBaseUrl.trim() !== '' && window.shopAiApiBaseUrl.trim().toLowerCase() !== 'null') {
-  //   if (window.shopAiApiBaseUrl.startsWith('http://') || window.shopAiApiBaseUrl.startsWith('https://')) {
-  //     determinedApiBaseUrl = window.shopAiApiBaseUrl.trim();
-  //   } else {
-  //     console.warn("window.shopAiApiBaseUrl was not a valid URL, using fallback:", window.shopAiApiBaseUrl);
-  //   }
-  // }
-  // const API_BASE_URL = determinedApiBaseUrl; // This is not used in the current file structure. chat.jsx uses relative path.
-  // console.log("Chat.js using API_BASE_URL:", API_BASE_URL);
-
-
   const ShopAIChat = {
+    State: {
+      conversationId: null,
+      isChatOpenedEver: false, // To log CHAT_OPENED only once per page load session if desired
+    },
+
+    Log: {
+      sendInteraction: async function(eventType, eventDetail = {}) {
+        const config = window.shopChatConfig || {};
+        const shopDomain = config.shopDomain || (window.Shopify && window.Shopify.shop);
+
+        if (!shopDomain) {
+          console.warn("Shop AI Chat Log: Shop domain not configured/available. Cannot send interaction for event:", eventType);
+          return;
+        }
+
+        // For CHAT_OPENED, conversationId might be null if it's the very first interaction.
+        // The API endpoint can handle a null conversationId or generate a temporary one if needed for such events.
+        let currentConversationId = ShopAIChat.State.conversationId;
+        if (!currentConversationId && eventType !== "CHAT_OPENED") {
+             console.warn(`Shop AI Chat Log: Conversation ID not available for event type "${eventType}".`);
+             // Depending on strictness, might return or use a placeholder.
+             // For now, we'll allow it to be sent as null or let backend assign a temporary if needed.
+        }
+
+
+        const logData = {
+          shop: shopDomain,
+          conversationId: currentConversationId, // Can be null for CHAT_OPENED
+          eventType: eventType,
+          eventDetail: eventDetail
+        };
+
+        try {
+          const baseUrl = window.shopAiApiBaseUrl || '';
+          const response = await fetch(`${baseUrl}/api/log-interaction`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(logData),
+          });
+
+          if (!response.ok) {
+            // console.error('Shop AI Chat Log: API Error:', response.status, await response.text());
+          } else {
+            // console.log('Shop AI Chat Log: Interaction logged successfully', eventType);
+          }
+        } catch (error) {
+          console.error('Shop AI Chat Log: Failed to send interaction log for event ' + eventType + ':', error);
+        }
+      }
+    },
+
     UI: {
       elements: {},
       isMobile: false,
@@ -134,12 +170,12 @@
       },
 
       setupEventListeners: function() {
-        const { chatBubble, closeButton, chatInput, sendButton, messagesContainer } = this.elements;
+        const { chatBubble, closeButton, chatInput, sendButton } = this.elements; // Removed messagesContainer as it's passed directly
         chatBubble.addEventListener('click', () => this.toggleChatWindow());
         closeButton.addEventListener('click', () => this.closeChatWindow());
         chatInput.addEventListener('keypress', (e) => {
           if (e.key === 'Enter' && chatInput.value.trim() !== '') {
-            ShopAIChat.Message.send(chatInput, messagesContainer);
+            ShopAIChat.Message.send(chatInput, this.elements.messagesContainer); // Pass messagesContainer
             if (this.isMobile) {
               chatInput.blur();
               setTimeout(() => chatInput.focus(), 300);
@@ -148,7 +184,7 @@
         });
         sendButton.addEventListener('click', () => {
           if (chatInput.value.trim() !== '') {
-            ShopAIChat.Message.send(chatInput, messagesContainer);
+            ShopAIChat.Message.send(chatInput, this.elements.messagesContainer); // Pass messagesContainer
             if (this.isMobile) {
               setTimeout(() => chatInput.focus(), 300);
             }
@@ -174,8 +210,15 @@
       },
       toggleChatWindow: function() {
         const { chatWindow, chatInput } = this.elements;
+        const becomingActive = !chatWindow.classList.contains('active');
+
         chatWindow.classList.toggle('active');
-        if (chatWindow.classList.contains('active')) {
+
+        if (becomingActive) {
+          if (!ShopAIChat.State.isChatOpenedEver) {
+            ShopAIChat.Log.sendInteraction("CHAT_OPENED");
+            ShopAIChat.State.isChatOpenedEver = true;
+          }
           if (this.isMobile) {
             document.body.classList.add('shop-ai-chat-open');
             setTimeout(() => chatInput.focus(), 500);
@@ -198,11 +241,12 @@
       scrollToBottom: function() {
         const { messagesContainer } = this.elements;
         setTimeout(() => {
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          if(messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 100);
       },
       showTypingIndicator: function() {
         const { messagesContainer } = this.elements;
+        if(!messagesContainer) return;
         const typingIndicator = document.createElement('div');
         typingIndicator.classList.add('shop-ai-typing-indicator');
         typingIndicator.innerHTML = '<span></span><span></span><span></span>';
@@ -211,6 +255,7 @@
       },
       removeTypingIndicator: function() {
         const { messagesContainer } = this.elements;
+        if(!messagesContainer) return;
         const typingIndicator = messagesContainer.querySelector('.shop-ai-typing-indicator');
         if (typingIndicator) {
           typingIndicator.remove();
@@ -225,8 +270,8 @@
         const limitedProducts = products.slice(0, maxProducts);
 
         const { messagesContainer } = this.elements;
+        if(!messagesContainer) return;
 
-        // Check if a product section already exists, if so, remove it to refresh
         let productSection = messagesContainer.querySelector('.shop-ai-product-section');
         if (productSection) {
             productSection.remove();
@@ -238,20 +283,17 @@
 
         const header = document.createElement('div');
         header.classList.add('shop-ai-product-header');
-        header.innerHTML = '<h4>Top Matching Products</h4>'; // Consider making this configurable
+        header.innerHTML = '<h4>Top Matching Products</h4>';
         productSection.appendChild(header);
 
         const productsContainer = document.createElement('div');
-        // Clear existing classes and add the base class
         productsContainer.className = 'shop-ai-product-grid';
 
         if (displayMode === 'carousel') {
           productsContainer.classList.add('product-grid-carousel');
         } else if (displayMode === 'combo') {
-          // For 'combo', we'll use 'product-grid-card' for JS logic, CSS can differ
           productsContainer.classList.add('product-grid-card');
-          // Or add 'product-grid-combo' if specific JS logic for combo is needed later
-        } else { // 'card' or default
+        } else {
           productsContainer.classList.add('product-grid-card');
         }
         productSection.appendChild(productsContainer);
@@ -266,31 +308,36 @@
             const productCardElement = ShopAIChat.Product.createCard(product);
             if (displayMode === 'carousel') {
               productCardElement.style.width = itemWidth;
-              productCardElement.style.flexShrink = '0'; // Important for flex items in a scrollable container
+              productCardElement.style.flexShrink = '0';
             }
             productsContainer.appendChild(productCardElement);
           });
         }
         this.scrollToBottom();
       }
-    }, // End ShopAIChat.UI
+    },
 
     Message: {
       send: async function(chatInput, messagesContainer) {
         const userMessage = chatInput.value.trim();
-        const conversationId = sessionStorage.getItem('shopAiConversationId');
+        // const conversationId = ShopAIChat.State.conversationId; // Use state conversationId
         this.add(userMessage, 'user', messagesContainer);
+        ShopAIChat.Log.sendInteraction("USER_MESSAGE_SENT", { messageLength: userMessage.length });
         chatInput.value = '';
         ShopAIChat.UI.showTypingIndicator();
         try {
-          ShopAIChat.API.streamResponse(userMessage, conversationId, messagesContainer);
+          ShopAIChat.API.streamResponse(userMessage, ShopAIChat.State.conversationId, messagesContainer);
         } catch (error) {
-          console.error('Error communicating with Claude API:', error);
+          console.error('Error sending message:', error); // Changed log from Claude API to generic
           ShopAIChat.UI.removeTypingIndicator();
-          this.add("Sorry, I couldn't process your request at the moment. Please try again later.", 'assistant', messagesContainer);
+          this.add("Sorry, I couldn't process your request. Please try again later.", 'assistant', messagesContainer);
         }
       },
       add: function(text, sender, messagesContainer) {
+        if(!messagesContainer) {
+          console.error("Messages container not found for adding message:", text);
+          return null;
+        }
         const messageElement = document.createElement('div');
         messageElement.classList.add('shop-ai-message', sender);
         if (sender === 'assistant') {
@@ -383,16 +430,17 @@
       streamResponse: async function(userMessage, conversationId, messagesContainer) {
         let currentMessageElement = null;
         try {
-          const promptType = window.shopChatConfig?.promptType || "standardAssistant";
-          const llmProvider = window.shopChatConfig?.llmProvider || 'claude';
+          const config = window.shopChatConfig || {};
+          const promptType = config.promptType || config.systemPromptKey || "standardAssistant";
+          const llmProvider = config.llmProvider || 'claude'; // This llmProvider is for the request, server ultimately decides
           const requestBody = JSON.stringify({
             message: userMessage,
-            conversation_id: conversationId,
+            conversation_id: conversationId, // Can be null if it's the first message and ID not set yet
             prompt_type: promptType,
             llm_provider: llmProvider
           });
-          const streamUrl = '/chat'; // Relative path to proxy
-          const shopId = window.shopId;
+          const streamUrl = '/chat';
+          const shopId = window.shopId; // Assumes window.shopId is set in Liquid
           const response = await fetch(streamUrl, {
             method: 'POST',
             headers: {
@@ -430,9 +478,9 @@
             }
           }
         } catch (error) {
-          console.error('Error in streaming:', error);
+          console.error('Error in streaming response:', error);
           ShopAIChat.UI.removeTypingIndicator();
-          ShopAIChat.Message.add("Sorry, I couldn't process your request. Please try again later.",
+          ShopAIChat.Message.add("Sorry, an error occurred while processing your request.",
             'assistant', messagesContainer);
         }
       },
@@ -441,6 +489,7 @@
           case 'id':
             if (data.conversation_id) {
               sessionStorage.setItem('shopAiConversationId', data.conversation_id);
+              ShopAIChat.State.conversationId = data.conversation_id; // Set state
             }
             break;
           case 'chunk':
@@ -458,9 +507,9 @@
             ShopAIChat.UI.removeTypingIndicator();
             break;
           case 'error':
-            console.error('Stream error:', data.error);
+            console.error('Stream error from server:', data.error);
             ShopAIChat.UI.removeTypingIndicator();
-            currentMessageElement.textContent = "Sorry, I couldn't process your request. Please try again later.";
+            currentMessageElement.textContent = data.error.message || "Sorry, an error occurred.";
             break;
           case 'rate_limit_exceeded':
             console.error('Rate limit exceeded:', data.error);
@@ -490,8 +539,7 @@
           loadingMessage.classList.add('shop-ai-message', 'assistant');
           loadingMessage.textContent = "Loading conversation history...";
           messagesContainer.appendChild(loadingMessage);
-          const historyUrl = `/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`; // Relative
-          // console.log('Fetching history from:', historyUrl);
+          const historyUrl = `/chat?history=true&conversation_id=${encodeURIComponent(conversationId)}`;
           const response = await fetch(historyUrl, {
             method: 'GET',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -504,7 +552,9 @@
           const data = await response.json();
           messagesContainer.removeChild(loadingMessage);
 
-          const config = window.shopChatConfig || {}; // Use config for welcome message
+          const config = window.shopChatConfig || {};
+          ShopAIChat.State.conversationId = conversationId; // Set state as we are loading this history
+
           if (!data.messages || data.messages.length === 0) {
             const welcomeMessage = config.welcomeMessage || "👋 Hi there! How can I help you today?";
             ShopAIChat.Message.add(welcomeMessage, 'assistant', messagesContainer);
@@ -522,7 +572,7 @@
           ShopAIChat.UI.scrollToBottom();
         } catch (error) {
           console.error('Error fetching chat history:', error);
-          const config = window.shopChatConfig || {}; // Use config for welcome message
+          const config = window.shopChatConfig || {};
           const loadingMessage = messagesContainer.querySelector('.shop-ai-message.assistant');
           if (loadingMessage && loadingMessage.textContent === "Loading conversation history...") {
             messagesContainer.removeChild(loadingMessage);
@@ -530,11 +580,12 @@
           const welcomeMessage = config.welcomeMessage || "👋 Hi there! How can I help you today?";
           ShopAIChat.Message.add(welcomeMessage, 'assistant', messagesContainer);
           sessionStorage.removeItem('shopAiConversationId');
+          ShopAIChat.State.conversationId = null; // Clear state
         }
       }
     },
     Auth: {
-      openAuthPopup: function(authUrlOrElement) {
+      openAuthPopup: function(authUrlOrElement) { /* ... (content mostly unchanged but ensure it uses ShopAIChat.State.conversationId if needed internally) ... */
         let authUrl;
         if (typeof authUrlOrElement === 'string') {
           authUrl = authUrlOrElement;
@@ -547,16 +598,16 @@
         const top = (window.innerHeight - height) / 2 + window.screenY;
         const popup = window.open(authUrl, 'ShopifyAuth', `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
         if (popup) { popup.focus(); } else { alert('Please allow popups for this site to authenticate with Shopify.'); }
-        const conversationId = sessionStorage.getItem('shopAiConversationId');
-        if (conversationId) {
+
+        const currentConversationId = ShopAIChat.State.conversationId || sessionStorage.getItem('shopAiConversationId');
+        if (currentConversationId) {
           const messagesContainer = document.querySelector('.shop-ai-chat-messages');
-          ShopAIChat.Message.add("Authentication in progress. Please complete the process in the popup window.", 'assistant', messagesContainer);
-          this.startTokenPolling(conversationId, messagesContainer);
+          if(messagesContainer) ShopAIChat.Message.add("Authentication in progress...", 'assistant', messagesContainer);
+          this.startTokenPolling(currentConversationId, messagesContainer);
         }
       },
-      startTokenPolling: function(conversationId, messagesContainer) {
+      startTokenPolling: function(conversationId, messagesContainer) { /* ... (content mostly unchanged) ... */
         if (!conversationId) return;
-        // console.log('Starting token polling for conversation:', conversationId);
         const pollingId = 'polling_' + Date.now();
         sessionStorage.setItem('shopAiTokenPollingId', pollingId);
         let attemptCount = 0;
@@ -566,16 +617,16 @@
           if (attemptCount >= maxAttempts) { return; }
           attemptCount++;
           try {
-            const tokenUrl = '/auth/token-status?conversation_id=' + encodeURIComponent(conversationId); // Relative
+            const tokenUrl = '/auth/token-status?conversation_id=' + encodeURIComponent(conversationId);
             const response = await fetch(tokenUrl);
             if (!response.ok) { throw new Error('Token status check failed: ' + response.status); }
             const data = await response.json();
             if (data.status === 'authorized') {
               const message = sessionStorage.getItem('shopAiLastMessage');
-              if (message) {
+              if (message && messagesContainer) {
                 sessionStorage.removeItem('shopAiLastMessage');
                 setTimeout(() => {
-                  ShopAIChat.Message.add("Authorization successful! I'm now continuing with your request.", 'assistant', messagesContainer);
+                  ShopAIChat.Message.add("Authorization successful! Continuing...", 'assistant', messagesContainer);
                   ShopAIChat.API.streamResponse(message, conversationId, messagesContainer);
                 }, 500);
               }
@@ -619,13 +670,18 @@
         info.appendChild(title);
         const price = document.createElement('p');
         price.classList.add('shop-ai-product-price');
-        price.textContent = product.price;
+        price.textContent = product.price; // Assuming price is already formatted string
         info.appendChild(price);
         const button = document.createElement('button');
         button.classList.add('shop-ai-add-to-cart');
         button.textContent = 'Add to Cart';
-        button.dataset.productId = product.id;
+        button.dataset.productId = product.id; // Store product ID
         button.addEventListener('click', function() {
+          ShopAIChat.Log.sendInteraction("ADD_TO_CART_FROM_CHAT_PRODUCT", {
+            productId: product.id,
+            productName: product.title,
+            productPrice: product.price
+          });
           const input = document.querySelector('.shop-ai-chat-input input');
           if (input) {
             input.value = `Add ${product.title} to my cart`;
@@ -645,21 +701,21 @@
           console.error("Shop AI Chat: Container not found. Cannot initialize.");
           return;
       }
-      this.UI.init(container); // This will call applyDynamicStyles
+      this.UI.init(container);
 
-      const conversationId = sessionStorage.getItem('shopAiConversationId');
+      const conversationIdFromSession = sessionStorage.getItem('shopAiConversationId');
       const config = window.shopChatConfig || {};
 
-      if (conversationId) {
-        this.API.fetchChatHistory(conversationId, this.UI.elements.messagesContainer);
+      if (conversationIdFromSession) {
+        ShopAIChat.State.conversationId = conversationIdFromSession;
+        this.API.fetchChatHistory(conversationIdFromSession, this.UI.elements.messagesContainer);
       } else {
+        ShopAIChat.State.conversationId = null;
         const welcomeMessage = config.welcomeMessage || "👋 Hi there! How can I help you today?";
         this.Message.add(welcomeMessage, 'assistant', this.UI.elements.messagesContainer);
       }
     }
-  }; // End ShopAIChat object
+  };
 
-  // The ShopAIChat.init() is now called from the Liquid file's
-  // fetchChatConfigAndInit function, after the config is fetched.
-  // So, the direct DOMContentLoaded listener here that calls it is removed.
+  // Initialization is now triggered from chat-interface.liquid after config fetch.
 })();

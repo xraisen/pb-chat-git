@@ -10,6 +10,7 @@ import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server.js"; // Ensure .js if that's the actual filename
 import { createGeminiService } from "../services/gemini.server.js";
 import { getAppConfiguration } from "../db.server.js"; // Added import
+import prisma from "../db.server.js"; // For logging
 import { createToolService } from "../services/tool.server";
 import { unauthenticated } from "../shopify.server";
 
@@ -133,6 +134,12 @@ async function handleChatSession({
   stream
 }) {
   const shopDomain = request.headers.get("Origin"); // Assuming this is a reliable way to get shop domain for config
+  // Log USER_MESSAGE_SENT_BACKEND
+  // Note: conversationId might be new here if client didn't provide one.
+  // The log function can handle temporary/generated IDs if needed.
+  await logChatInteraction(shopDomain, conversationId, "USER_MESSAGE_SENT_BACKEND", { messageLength: userMessage.length, promptType });
+
+
   if (!shopDomain) {
     stream.sendMessage({ type: 'error', error: { message: "Shop domain could not be determined." } });
     stream.sendMessage({ type: 'end_turn' });
@@ -293,6 +300,13 @@ async function handleChatSession({
           });
           
           saveMessage(conversationId, roleToSave, JSON.stringify(messageToSave))
+            .then(() => {
+              logChatInteraction(shopDomain, conversationId, "ASSISTANT_MESSAGE_SAVED", {
+                messageLength: typeof messageToSave === 'string' ? messageToSave.length : JSON.stringify(messageToSave).length,
+                role: roleToSave,
+                llmProvider: selectedLlmProvider // Log which LLM was used
+              });
+            })
             .catch((error) => {
               console.error("Error saving assistant message to database:", error);
             });
@@ -330,9 +344,11 @@ async function handleChatSession({
         geminiToolCallEventData = null; // Reset after use
 
         console.log(`[handleChatSession] Gemini requested tool: ${toolName}, Args:`, toolArgs);
+        await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_INITIATED_${toolName.toUpperCase()}`, { args: toolArgs, llmProvider: selectedLlmProvider });
         let toolExecutionResult;
         try {
           const mcpResponse = await mcpClient.callTool(toolName, toolArgs);
+          await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_COMPLETED_${toolName.toUpperCase()}`, { success: !mcpResponse.error, responseOutput: mcpResponse });
           if (mcpResponse.error) {
             console.error(`[handleChatSession] MCP Tool Error for ${toolName}:`, mcpResponse.error);
             toolExecutionResult = { error: true, message: mcpResponse.error.data || "Tool execution failed", details: mcpResponse.error };
@@ -385,8 +401,9 @@ async function handleChatSession({
             
             // It's important that the tool_use message itself was saved.
             // The onMessage handler above should have caught it if it was part of message.content.
-
+            await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_INITIATED_${toolName.toUpperCase()}`, { args: toolArgs, llmProvider: selectedLlmProvider });
             const mcpResponse = await mcpClient.callTool(toolName, toolArgs);
+            await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_COMPLETED_${toolName.toUpperCase()}`, { success: !mcpResponse.error, responseOutput: mcpResponse });
 
             if (mcpResponse.error) {
               await toolService.handleToolError( // This updates conversationHistory
@@ -484,7 +501,7 @@ async function getCustomerMcpEndpoint(shopDomain, conversationId) {
  */
 function getCorsHeaders(request) {
   const origin = request.headers.get("Origin") || "*";
-  const requestHeaders = request.headers.get("Access-Control-Request-Headers") || "Content-Type, Accept";
+  const requestHeaders = request.headers.get("Access-Control-Request-Headers") || "Content-Type, Accept, X-Shopify-Shop-Id"; // Added X-Shopify-Shop-Id
 
   return {
     "Access-Control-Allow-Origin": origin,
@@ -510,6 +527,27 @@ function getSseHeaders(request) {
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,OPTIONS,POST",
-    "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+    "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-Shopify-Shop-Id" // Added X-Shopify-Shop-Id
   };
+}
+
+// Helper function for logging interactions
+async function logChatInteraction(shop, conversationId, eventType, eventDetail = {}) {
+  if (!shop || !conversationId) { // Allow logs even if convId is briefly null for first message
+    console.warn(`ChatLog: Missing shop or conversationId for event ${eventType}. Shop: ${shop}, ConvID: ${conversationId}`);
+    // Decide if you want to proceed or not. For now, let's proceed if shop is present.
+    if(!shop) return;
+  }
+  try {
+    await prisma.chatInteractionLog.create({
+      data: {
+        shop,
+        conversationId: conversationId || `TEMP_${Date.now()}`, // Use a temporary ID if null
+        eventType,
+        eventDetail,
+      },
+    });
+  } catch (error) {
+    console.error(`ChatLog: Failed to log interaction (${eventType}) for shop ${shop}, conv ${conversationId}:`, error);
+  }
 }

@@ -54,6 +54,7 @@ export async function loader({ request }) {
 
     // Sanitize: Select only public-safe fields
     const publicConfig = {
+      shopDomain: shopDomain, // Add shopDomain to the public config
       // llmProvider: fullConfig.llmProvider, // Client likely doesn't need to know this directly
       botName: fullConfig.botName,
       welcomeMessage: fullConfig.welcomeMessage,
