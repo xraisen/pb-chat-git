@@ -14,6 +14,24 @@ import prisma from "../db.server.js"; // For logging
 import { createToolService } from "../services/tool.server";
 import { unauthenticated } from "../shopify.server";
 
+// Helper function to append UTM parameters to a URL
+function appendUtmParameters(urlString, utmParameters) {
+  if (!urlString || Object.keys(utmParameters).length === 0) {
+    return urlString;
+  }
+  try {
+    const url = new URL(urlString);
+    Object.entries(utmParameters).forEach(([key, value]) => {
+      if (value) { // Ensure value is not null/undefined/empty
+        url.searchParams.append(key, value);
+      }
+    });
+    return url.toString();
+  } catch (error) {
+    console.error("Failed to append UTM parameters to URL:", urlString, error);
+    return urlString; // Return original URL on error
+  }
+}
 
 /**
  * Remix loader function for handling GET requests
@@ -146,7 +164,21 @@ async function handleChatSession({
     return;
   }
 
-  const appConfig = await getAppConfiguration(shopDomain);
+  const appConfig = await getShopChatbotConfig(shopDomain); // Renamed during previous step
+
+  const utmParamsConfig = {
+    utm_source: appConfig?.utmSource,
+    utm_medium: appConfig?.utmMedium,
+    utm_campaign: appConfig?.utmCampaign,
+    utm_term: appConfig?.utmTerm,
+    utm_content: appConfig?.utmContent,
+  };
+  const activeUtmParams = Object.entries(utmParamsConfig)
+    .filter(([_, value]) => value)
+    .reduce((obj, [key, value]) => {
+      obj[key] = value;
+      return obj;
+    }, {});
 
   let selectedLlmProvider = null;
   let apiKey = null;
@@ -353,7 +385,12 @@ async function handleChatSession({
             console.error(`[handleChatSession] MCP Tool Error for ${toolName}:`, mcpResponse.error);
             toolExecutionResult = { error: true, message: mcpResponse.error.data || "Tool execution failed", details: mcpResponse.error };
           } else {
-            toolExecutionResult = mcpResponse; // This is the direct JSON output from the tool
+            toolExecutionResult = mcpResponse;
+            // Check if tool response contains a checkoutUrl and append UTMs
+            if (toolExecutionResult && toolExecutionResult.checkoutUrl && typeof toolExecutionResult.checkoutUrl === 'string') {
+              toolExecutionResult.checkoutUrl = appendUtmParameters(toolExecutionResult.checkoutUrl, activeUtmParams);
+              logChatInteraction(shopDomain, conversationId, "CHECKOUT_URL_WITH_UTM_GENERATED", { originalUrl: mcpResponse.checkoutUrl, finalUrl: toolExecutionResult.checkoutUrl, toolName });
+            }
           }
         } catch (e) {
           console.error(`[handleChatSession] Exception calling MCP Tool ${toolName}:`, e);
@@ -403,11 +440,21 @@ async function handleChatSession({
             // The onMessage handler above should have caught it if it was part of message.content.
             await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_INITIATED_${toolName.toUpperCase()}`, { args: toolArgs, llmProvider: selectedLlmProvider });
             const mcpResponse = await mcpClient.callTool(toolName, toolArgs);
-            await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_COMPLETED_${toolName.toUpperCase()}`, { success: !mcpResponse.error, responseOutput: mcpResponse });
 
-            if (mcpResponse.error) {
-              await toolService.handleToolError( // This updates conversationHistory
-                mcpResponse,
+            // Check if tool response contains a checkoutUrl and append UTMs
+            let processedMcpResponse = mcpResponse;
+            if (mcpResponse && !mcpResponse.error && mcpResponse.checkoutUrl && typeof mcpResponse.checkoutUrl === 'string') {
+                processedMcpResponse = {
+                    ...mcpResponse,
+                    checkoutUrl: appendUtmParameters(mcpResponse.checkoutUrl, activeUtmParams)
+                };
+                logChatInteraction(shopDomain, conversationId, "CHECKOUT_URL_WITH_UTM_GENERATED", { originalUrl: mcpResponse.checkoutUrl, finalUrl: processedMcpResponse.checkoutUrl, toolName });
+            }
+            await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_COMPLETED_${toolName.toUpperCase()}`, { success: !processedMcpResponse.error, responseOutput: processedMcpResponse });
+
+            if (processedMcpResponse.error) { // Use processedMcpResponse here
+              await toolService.handleToolError(
+                processedMcpResponse,
                 toolName,
                 toolUseId,
                 conversationHistory, // Pass by reference, it gets mutated

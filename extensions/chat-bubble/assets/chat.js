@@ -7,7 +7,7 @@
   const ShopAIChat = {
     State: {
       conversationId: null,
-      isChatOpenedEver: false, // To log CHAT_OPENED only once per page load session if desired
+      isChatOpenedEver: false,
     },
 
     Log: {
@@ -20,19 +20,14 @@
           return;
         }
 
-        // For CHAT_OPENED, conversationId might be null if it's the very first interaction.
-        // The API endpoint can handle a null conversationId or generate a temporary one if needed for such events.
         let currentConversationId = ShopAIChat.State.conversationId;
         if (!currentConversationId && eventType !== "CHAT_OPENED") {
              console.warn(`Shop AI Chat Log: Conversation ID not available for event type "${eventType}".`);
-             // Depending on strictness, might return or use a placeholder.
-             // For now, we'll allow it to be sent as null or let backend assign a temporary if needed.
         }
-
 
         const logData = {
           shop: shopDomain,
-          conversationId: currentConversationId, // Can be null for CHAT_OPENED
+          conversationId: currentConversationId,
           eventType: eventType,
           eventDetail: eventDetail
         };
@@ -41,24 +36,130 @@
           const baseUrl = window.shopAiApiBaseUrl || '';
           const response = await fetch(`${baseUrl}/api/log-interaction`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json', },
             body: JSON.stringify(logData),
           });
 
-          if (!response.ok) {
-            // console.error('Shop AI Chat Log: API Error:', response.status, await response.text());
-          } else {
-            // console.log('Shop AI Chat Log: Interaction logged successfully', eventType);
-          }
+          if (!response.ok) { /* console.error('Shop AI Chat Log: API Error:', response.status, await response.text()); */ }
+          else { /* console.log('Shop AI Chat Log: Interaction logged successfully', eventType); */ }
         } catch (error) {
           console.error('Shop AI Chat Log: Failed to send interaction log for event ' + eventType + ':', error);
         }
       }
     },
 
-    UI: {
+    Promotions: {
+      init: function() {
+        const config = window.shopChatConfig || {};
+        if (!ShopAIChat.UI.elements.messagesContainer) {
+          console.warn("Shop AI Chat Promotions: messagesContainer not ready.");
+          return;
+        }
+        if (!config.promotionalMessages && !config.promotionalProducts) {
+          return;
+        }
+        this.evaluateTriggers();
+        this.setupEventListeners();
+      },
+
+      evaluateTriggers: function() {
+        const config = window.shopChatConfig || {};
+        const messages = config.promotionalMessages || [];
+        const products = config.promotionalProducts || [];
+
+        messages.forEach(promoMsg => {
+          if (!promoMsg || !promoMsg.id || !promoMsg.triggerType) return;
+          const uniqueId = `promo_msg_${promoMsg.id}`;
+          if (promoMsg.triggerType === 'TIME_ON_SITE') {
+            const timeDelay = parseInt(promoMsg.triggerValue, 10) * 1000;
+            if (!isNaN(timeDelay) && timeDelay > 0 && !sessionStorage.getItem(`promo_timer_set_${uniqueId}`)) {
+              setTimeout(() => {
+                if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
+                  ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+                  ShopAIChat.Log.sendInteraction("PROMOTIONAL_MESSAGE_DISPLAYED", { messageId: promoMsg.id, trigger: promoMsg.triggerType, autoPopup: true });
+                  sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
+                }
+              }, timeDelay);
+              sessionStorage.setItem(`promo_timer_set_${uniqueId}`, 'true');
+            }
+          } else if (this.checkTrigger(promoMsg.triggerType, promoMsg.triggerValue, uniqueId)) {
+            if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
+              ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+              ShopAIChat.Log.sendInteraction("PROMOTIONAL_MESSAGE_DISPLAYED", { messageId: promoMsg.id, trigger: promoMsg.triggerType });
+              sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
+            }
+          }
+        });
+
+        products.forEach(promoProd => {
+          if (!promoProd || !promoProd.id || !promoProd.triggerType) return;
+          const uniqueId = `promo_prod_${promoProd.id}`;
+          if (promoProd.triggerType === 'TIME_ON_SITE') {
+            const timeDelay = parseInt(promoProd.triggerValue, 10) * 1000;
+            if (!isNaN(timeDelay) && timeDelay > 0 && !sessionStorage.getItem(`promo_timer_set_${uniqueId}`)) {
+              setTimeout(() => {
+                if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
+                  ShopAIChat.Message.add(`Check out this special offer: ${promoProd.productId}`, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+                  ShopAIChat.Log.sendInteraction("PROMOTIONAL_PRODUCT_DISPLAYED", { promotionalProductId: promoProd.id, productId: promoProd.productId, trigger: promoProd.triggerType, autoPopup: true });
+                  sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
+                }
+              }, timeDelay);
+              sessionStorage.setItem(`promo_timer_set_${uniqueId}`, 'true');
+            }
+          } else if (this.checkTrigger(promoProd.triggerType, promoProd.triggerValue, uniqueId)) {
+            if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
+              ShopAIChat.Message.add(`Check out this special offer: ${promoProd.productId}`, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+              ShopAIChat.Log.sendInteraction("PROMOTIONAL_PRODUCT_DISPLAYED", { promotionalProductId: promoProd.id, productId: promoProd.productId, trigger: promoProd.triggerType });
+              sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
+            }
+          }
+        });
+      },
+
+      checkTrigger: function(type, value, uniqueId) {
+        switch (type) {
+          case 'FIRST_VISIT':
+            if (!localStorage.getItem('shopAiChatFirstVisitDone')) {
+              localStorage.setItem('shopAiChatFirstVisitDone', 'true');
+              return true;
+            }
+            return false;
+          case 'PAGE_URL':
+            if (!value) return false;
+            return window.location.href.includes(value);
+          case 'ON_CART_PAGE':
+            return window.location.pathname.includes('/cart');
+          case 'RELATED_CATEGORY':
+          case 'TIME_CAMPAIGN':
+            return false;
+          default:
+            return false;
+        }
+      },
+
+      setupEventListeners: function() {
+        document.addEventListener('mouseout', (e) => {
+          if (!e.toElement && !e.relatedTarget && document.hasFocus()) {
+            const config = window.shopChatConfig || {};
+            if (!config.promotionalMessages) return;
+
+            const abandonmentMessages = (config.promotionalMessages).filter(m => m.triggerType === 'CART_ABANDONMENT_ATTEMPT' && m.isActive);
+
+            abandonmentMessages.forEach(promoMsg => {
+              if (!promoMsg || !promoMsg.id) return;
+              const uniqueId = `promo_msg_${promoMsg.id}`;
+              if (!sessionStorage.getItem(`promo_shown_${uniqueId}`)) {
+                ShopAIChat.Message.add(promoMsg.message, 'assistant', ShopAIChat.UI.elements.messagesContainer);
+                ShopAIChat.Log.sendInteraction("PROMOTIONAL_MESSAGE_DISPLAYED", { messageId: promoMsg.id, trigger: promoMsg.triggerType, autoPopup: true });
+                sessionStorage.setItem(`promo_shown_${uniqueId}`, 'true');
+              }
+            });
+          }
+        });
+      }
+    }, // End ShopAIChat.Promotions
+
+    UI: { // ... (Existing UI object content from step 35, no changes here) ...
       elements: {},
       isMobile: false,
 
@@ -170,12 +271,12 @@
       },
 
       setupEventListeners: function() {
-        const { chatBubble, closeButton, chatInput, sendButton } = this.elements; // Removed messagesContainer as it's passed directly
+        const { chatBubble, closeButton, chatInput, sendButton } = this.elements;
         chatBubble.addEventListener('click', () => this.toggleChatWindow());
         closeButton.addEventListener('click', () => this.closeChatWindow());
         chatInput.addEventListener('keypress', (e) => {
           if (e.key === 'Enter' && chatInput.value.trim() !== '') {
-            ShopAIChat.Message.send(chatInput, this.elements.messagesContainer); // Pass messagesContainer
+            ShopAIChat.Message.send(chatInput, this.elements.messagesContainer);
             if (this.isMobile) {
               chatInput.blur();
               setTimeout(() => chatInput.focus(), 300);
@@ -184,7 +285,7 @@
         });
         sendButton.addEventListener('click', () => {
           if (chatInput.value.trim() !== '') {
-            ShopAIChat.Message.send(chatInput, this.elements.messagesContainer); // Pass messagesContainer
+            ShopAIChat.Message.send(chatInput, this.elements.messagesContainer);
             if (this.isMobile) {
               setTimeout(() => chatInput.focus(), 300);
             }
@@ -201,14 +302,14 @@
         });
       },
 
-      setupMobileViewport: function() {
+      setupMobileViewport: function() { /* ... unchanged ... */
         const setViewportHeight = () => {
           document.documentElement.style.setProperty('--viewport-height', `${window.innerHeight}px`);
         };
         window.addEventListener('resize', setViewportHeight);
         setViewportHeight();
       },
-      toggleChatWindow: function() {
+      toggleChatWindow: function() { /* ... (logic from step 35 including CHAT_OPENED log) ... */
         const { chatWindow, chatInput } = this.elements;
         const becomingActive = !chatWindow.classList.contains('active');
 
@@ -230,7 +331,7 @@
           document.body.classList.remove('shop-ai-chat-open');
         }
       },
-      closeChatWindow: function() {
+      closeChatWindow: function() { /* ... unchanged ... */
         const { chatWindow, chatInput } = this.elements;
         chatWindow.classList.remove('active');
         if (this.isMobile) {
@@ -238,13 +339,13 @@
           document.body.classList.remove('shop-ai-chat-open');
         }
       },
-      scrollToBottom: function() {
+      scrollToBottom: function() { /* ... unchanged ... */
         const { messagesContainer } = this.elements;
         setTimeout(() => {
           if(messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, 100);
       },
-      showTypingIndicator: function() {
+      showTypingIndicator: function() { /* ... unchanged ... */
         const { messagesContainer } = this.elements;
         if(!messagesContainer) return;
         const typingIndicator = document.createElement('div');
@@ -253,7 +354,7 @@
         messagesContainer.appendChild(typingIndicator);
         this.scrollToBottom();
       },
-      removeTypingIndicator: function() {
+      removeTypingIndicator: function() { /* ... unchanged ... */
         const { messagesContainer } = this.elements;
         if(!messagesContainer) return;
         const typingIndicator = messagesContainer.querySelector('.shop-ai-typing-indicator');
@@ -261,7 +362,7 @@
           typingIndicator.remove();
         }
       },
-      displayProductResults: function(products) {
+      displayProductResults: function(products) { /* ... (logic from step 31) ... */
         const config = window.shopChatConfig || {};
         const displayMode = config.productDisplayMode || 'card';
         const maxProducts = parseInt(config.maxProductsToDisplay, 10) || 3;
@@ -317,10 +418,9 @@
       }
     },
 
-    Message: {
+    Message: { /* ... (logic from step 35, including USER_MESSAGE_SENT log) ... */
       send: async function(chatInput, messagesContainer) {
         const userMessage = chatInput.value.trim();
-        // const conversationId = ShopAIChat.State.conversationId; // Use state conversationId
         this.add(userMessage, 'user', messagesContainer);
         ShopAIChat.Log.sendInteraction("USER_MESSAGE_SENT", { messageLength: userMessage.length });
         chatInput.value = '';
@@ -328,7 +428,7 @@
         try {
           ShopAIChat.API.streamResponse(userMessage, ShopAIChat.State.conversationId, messagesContainer);
         } catch (error) {
-          console.error('Error sending message:', error); // Changed log from Claude API to generic
+          console.error('Error sending message:', error);
           ShopAIChat.UI.removeTypingIndicator();
           this.add("Sorry, I couldn't process your request. Please try again later.", 'assistant', messagesContainer);
         }
@@ -340,18 +440,30 @@
         }
         const messageElement = document.createElement('div');
         messageElement.classList.add('shop-ai-message', sender);
+        // If 'text' is an object (for structured promotional messages), use its content property
+        if (typeof text === 'object' && text !== null && text.content) {
+            messageElement.dataset.rawText = text.content;
+            if (text.type === 'promotional' || text.type === 'promotional_product') {
+                messageElement.classList.add('shop-ai-message-promotional');
+            }
+        } else {
+             messageElement.dataset.rawText = text;
+        }
+
         if (sender === 'assistant') {
-          messageElement.dataset.rawText = text;
           ShopAIChat.Formatting.formatMessageContent(messageElement);
         } else {
-          messageElement.textContent = text;
+          // For user messages, or if assistant message is not pre-formatted by markdown
+          if (messageElement.innerHTML === "") { // only set textContent if innerHTML wasn't set by formatMessageContent
+             messageElement.textContent = messageElement.dataset.rawText;
+          }
         }
         messagesContainer.appendChild(messageElement);
         ShopAIChat.UI.scrollToBottom();
         return messageElement;
       }
     },
-    Formatting: {
+    Formatting: { /* ... (Existing Formatting object content from step 35, no changes here) ... */
       formatMessageContent: function(element) {
         if (!element || !element.dataset.rawText) return;
         const rawText = element.dataset.rawText;
@@ -426,21 +538,21 @@
         return htmlContent;
       }
     },
-    API: {
+    API: { /* ... (Existing API object content from step 35, including State.conversationId updates) ... */
       streamResponse: async function(userMessage, conversationId, messagesContainer) {
         let currentMessageElement = null;
         try {
           const config = window.shopChatConfig || {};
           const promptType = config.promptType || config.systemPromptKey || "standardAssistant";
-          const llmProvider = config.llmProvider || 'claude'; // This llmProvider is for the request, server ultimately decides
+          const llmProvider = config.llmProvider || 'claude';
           const requestBody = JSON.stringify({
             message: userMessage,
-            conversation_id: conversationId, // Can be null if it's the first message and ID not set yet
+            conversation_id: conversationId,
             prompt_type: promptType,
             llm_provider: llmProvider
           });
           const streamUrl = '/chat';
-          const shopId = window.shopId; // Assumes window.shopId is set in Liquid
+          const shopId = window.shopId;
           const response = await fetch(streamUrl, {
             method: 'POST',
             headers: {
@@ -489,7 +601,7 @@
           case 'id':
             if (data.conversation_id) {
               sessionStorage.setItem('shopAiConversationId', data.conversation_id);
-              ShopAIChat.State.conversationId = data.conversation_id; // Set state
+              ShopAIChat.State.conversationId = data.conversation_id;
             }
             break;
           case 'chunk':
@@ -553,7 +665,7 @@
           messagesContainer.removeChild(loadingMessage);
 
           const config = window.shopChatConfig || {};
-          ShopAIChat.State.conversationId = conversationId; // Set state as we are loading this history
+          ShopAIChat.State.conversationId = conversationId;
 
           if (!data.messages || data.messages.length === 0) {
             const welcomeMessage = config.welcomeMessage || "👋 Hi there! How can I help you today?";
@@ -580,12 +692,12 @@
           const welcomeMessage = config.welcomeMessage || "👋 Hi there! How can I help you today?";
           ShopAIChat.Message.add(welcomeMessage, 'assistant', messagesContainer);
           sessionStorage.removeItem('shopAiConversationId');
-          ShopAIChat.State.conversationId = null; // Clear state
+          ShopAIChat.State.conversationId = null;
         }
       }
     },
-    Auth: {
-      openAuthPopup: function(authUrlOrElement) { /* ... (content mostly unchanged but ensure it uses ShopAIChat.State.conversationId if needed internally) ... */
+    Auth: { /* ... (Existing Auth object content from step 35, no changes here) ... */
+      openAuthPopup: function(authUrlOrElement) {
         let authUrl;
         if (typeof authUrlOrElement === 'string') {
           authUrl = authUrlOrElement;
@@ -606,7 +718,7 @@
           this.startTokenPolling(currentConversationId, messagesContainer);
         }
       },
-      startTokenPolling: function(conversationId, messagesContainer) { /* ... (content mostly unchanged) ... */
+      startTokenPolling: function(conversationId, messagesContainer) {
         if (!conversationId) return;
         const pollingId = 'polling_' + Date.now();
         sessionStorage.setItem('shopAiTokenPollingId', pollingId);
@@ -642,7 +754,7 @@
         setTimeout(poll, 2000);
       }
     },
-    Product: {
+    Product: { /* ... (Existing Product object content from step 35, including ADD_TO_CART_FROM_CHAT_PRODUCT log) ... */
       createCard: function(product) {
         const card = document.createElement('div');
         card.classList.add('shop-ai-product-card');
@@ -670,12 +782,12 @@
         info.appendChild(title);
         const price = document.createElement('p');
         price.classList.add('shop-ai-product-price');
-        price.textContent = product.price; // Assuming price is already formatted string
+        price.textContent = product.price;
         info.appendChild(price);
         const button = document.createElement('button');
         button.classList.add('shop-ai-add-to-cart');
         button.textContent = 'Add to Cart';
-        button.dataset.productId = product.id; // Store product ID
+        button.dataset.productId = product.id;
         button.addEventListener('click', function() {
           ShopAIChat.Log.sendInteraction("ADD_TO_CART_FROM_CHAT_PRODUCT", {
             productId: product.id,
@@ -713,6 +825,12 @@
         ShopAIChat.State.conversationId = null;
         const welcomeMessage = config.welcomeMessage || "👋 Hi there! How can I help you today?";
         this.Message.add(welcomeMessage, 'assistant', this.UI.elements.messagesContainer);
+      }
+      // Initialize Promotions module after main UI and config is ready
+      if (this.UI.elements.container) {
+           this.Promotions.init();
+      } else {
+          console.error("Shop AI Chat Promotions: UI not initialized, cannot start promotions module.");
       }
     }
   };
