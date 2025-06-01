@@ -4,15 +4,16 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { Form as RemixForm, useLoaderData, useActionData, useNavigation, json } from "@remix-run/react";
 import { authenticate } from "../../shopify.server";
 import { redirect } from "@remix-run/node";
-import { getAppConfiguration, updateAppConfiguration } from "../../db.server.js";
+import { getShopChatbotConfig, updateShopChatbotConfig } from "../../db.server.js"; // Updated function names
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const { shop } = session;
-  const appConfig = await getAppConfiguration(shop);
+  // Use the new function name and expect the full config object or defaults
+  const shopConfig = await getShopChatbotConfig(shop);
 
-  if (appConfig && appConfig.error) {
-    console.error("Error loading app configuration:", appConfig.error);
+  if (shopConfig && shopConfig.error) {
+    console.error("Error loading AI settings (ShopChatbotConfig):", shopConfig.error);
     // Return a default config but include an error message for the UI
     return json({
       llmProvider: 'gemini',
@@ -22,12 +23,10 @@ export const loader = async ({ request }) => {
     });
   }
 
-  // Ensure a default structure if no config exists, and ensure keys are not null for controlled components
-  return json(appConfig || {
-    llmProvider: 'gemini', // Default provider if nothing is set
-    geminiApiKey: '',
-    claudeApiKey: ''
-  });
+  // The getShopChatbotConfig now returns a comprehensive default object,
+  // so we can directly return it.
+  // The component will use `loaderData.fieldName ?? defaultValueFromComponent` for its state.
+  return json(shopConfig);
 };
 
 export const action = async ({ request }) => {
@@ -42,7 +41,12 @@ export const action = async ({ request }) => {
   const claudeApiKey = formData.get('claudeApiKey') || "";
 
   try {
-    await updateAppConfiguration(shop, { llmProvider, geminiApiKey, claudeApiKey });
+    // Pass only the relevant fields for this form to updateShopChatbotConfig
+    await updateShopChatbotConfig(shop, {
+      llmProvider,
+      geminiApiKey,
+      claudeApiKey
+    });
     // Optionally, you could return a success message via useActionData
     return redirect("/app/settings/ai", {
       // headers: { "X-Remix-Reload-Document": "true" } // To force data reload if needed
@@ -98,15 +102,16 @@ export default function AISettingsPage() {
         )}
         <Layout.Section>
           <Card>
-            <RemixForm method="post">
-              <FormLayout>
-                <Select
-                  label="LLM Provider"
+            <BlockStack gap="400" padding="400"> {/* Added BlockStack for padding and gap */}
+              <RemixForm method="post">
+                <FormLayout>
+                  <Select
+                    label="LLM Provider"
                   name="llmProvider"
                   options={llmProviderOptions}
                   onChange={handleLlmProviderChange}
                   value={llmProvider}
-                  helpText="Note: If you switch providers, ensure the corresponding API key below is saved."
+                  helpText="Choose your preferred Large Language Model provider. API keys for the selected provider must be configured below."
                 />
                 {llmProvider === 'gemini' && (
                   <TextField
@@ -116,7 +121,7 @@ export default function AISettingsPage() {
                     value={geminiApiKey}
                     onChange={handleGeminiApiKeyChange}
                     autoComplete="new-password"
-                    helpText="Leave blank to clear the key. Changes are saved on submit."
+                    helpText="Enter your Gemini API key. This is kept confidential. Leave blank if you do not want to use Gemini or to clear an existing key."
                   />
                 )}
                 {llmProvider === 'claude' && (
@@ -127,14 +132,15 @@ export default function AISettingsPage() {
                     value={claudeApiKey}
                     onChange={handleClaudeApiKeyChange}
                     autoComplete="new-password"
-                    helpText="Leave blank to clear the key. Changes are saved on submit."
+                    helpText="Enter your Claude API key. This is kept confidential. Leave blank if you do not want to use Claude or to clear an existing key."
                   />
                 )}
-                <Button submit primary loading={isSubmitting}>
-                  Save Settings
-                </Button>
-              </FormLayout>
-            </RemixForm>
+                  <Button submit primary loading={isSubmitting}>
+                    Save Settings
+                  </Button>
+                </FormLayout>
+              </RemixForm>
+            </BlockStack>
           </Card>
         </Layout.Section>
       </Layout>

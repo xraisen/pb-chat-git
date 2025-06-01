@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-  Page, Layout, Card, FormLayout, TextField, Select, Button, BlockStack, ChoiceList, Banner
+  Page, Layout, Card, FormLayout, TextField, Select, Button, BlockStack, ChoiceList, Banner, Collapsible, Icon, LegacyStack, Tooltip, Text as PolarisText
 } from '@shopify/polaris';
 import { TitleBar } from "@shopify/app-bridge-react";
-import { Form as RemixForm, useLoaderData, useActionData, useNavigation } from "@remix-run/react";
-import { json, redirect } from "@remix-run/node";
+import { Form as RemixForm, useLoaderData, useActionData, useNavigation, json } from "@remix-run/react";
+import { redirect } from "@remix-run/node";
 import { authenticate } from "../../shopify.server";
+import { InfoMinor } from '@shopify/polaris-icons';
 import { getShopChatbotConfig, updateShopChatbotConfig } from "../../db.server.js";
 import fs from "fs/promises";
 import path from "path";
@@ -140,8 +141,17 @@ export default function UISettingsPage() {
   const [chatBubbleSize, setChatBubbleSize] = useState(initialSettings.chatBubbleSize ?? "60px");
   const [chatBubbleColor, setChatBubbleColor] = useState(initialSettings.chatBubbleColor ?? "#E57399");
 
+  // State for Collapsible sections
+  const [isColorsOpen, setIsColorsOpen] = useState(true);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [systemPromptHelpModalOpen, setSystemPromptHelpModalOpen] = useState(false);
+
+  const handleToggleColors = useCallback(() => setIsColorsOpen((open) => !open), []);
+  const handleToggleAdvanced = useCallback(() => setIsAdvancedOpen((open) => !open), []);
+  const toggleSystemPromptHelpModal = useCallback(() => setSystemPromptHelpModalOpen((active) => !active), []);
+
   const handleSystemPromptChange = useCallback((value) => setSystemPromptKey(value), []);
-  const handlePositionChange = useCallback((value) => setPosition(value), []); // For ChoiceList, value is string[], we need string
+  const handlePositionChange = useCallback((value) => setPosition(value), []);
   const handleProductDisplayModeChange = useCallback((value) => setProductDisplayMode(value), []);
   const handleChatBubbleIconChange = useCallback((value) => setChatBubbleIcon(value), []);
 
@@ -189,10 +199,30 @@ export default function UISettingsPage() {
                       <TextField label="Welcome Message" name="welcomeMessage" value={welcomeMessage} onChange={setWelcomeMessage} multiline={3} autoComplete="off" />
                     </FormLayout.Group>
                     <FormLayout.Group>
-                       <Select label="System Prompt" name="systemPromptKey" options={systemPromptOptions} value={systemPromptKey} onChange={handleSystemPromptChange} />
-                      {systemPromptKey === 'custom' && ( // Ensure this matches the value used for custom
-                        <TextField label="Custom System Prompt" name="customSystemPrompt" value={customSystemPrompt} onChange={setCustomSystemPrompt} multiline={6} autoComplete="off" />
+                       <Select
+                          label="System Prompt"
+                          name="systemPromptKey"
+                          options={systemPromptOptions}
+                          value={systemPromptKey}
+                          onChange={handleSystemPromptChange}
+                          helpText="Defines the AI's personality and instructions. Select 'Custom' to write your own."
+                        />
+                      {systemPromptKey === 'custom' && (
+                        <TextField
+                          label="Custom System Prompt"
+                          name="customSystemPrompt"
+                          value={customSystemPrompt}
+                          onChange={setCustomSystemPrompt}
+                          multiline={6}
+                          autoComplete="off"
+                          helpText="Write your detailed system prompt here. Refer to LLM documentation for best practices."
+                        />
                       )}
+                       <div style={{ marginTop: 'var(--p-space-200)' }}> {/* Adjust spacing as needed */}
+                         <Button onClick={toggleSystemPromptHelpModal} variant="plain" size="slim">
+                           Learn more about system prompts
+                         </Button>
+                       </div>
                     </FormLayout.Group>
                   </FormLayout>
                 </BlockStack>
@@ -202,22 +232,162 @@ export default function UISettingsPage() {
                 <BlockStack gap="500">
                   <FormLayout>
                     <FormLayout.Group title="Widget Dimensions & Position">
-                      <TextField label="Width (px or %)" name="width" value={width} onChange={setWidth} autoComplete="off" />
-                      <TextField label="Height (px or vh)" name="height" value={height} onChange={setHeight} autoComplete="off" />
-                      <TextField label="Z-index" name="zIndex" type="number" value={zIndex} onChange={setZIndex} autoComplete="off" error={formErrors.zIndex} />
+                      <TextField label="Width (px or %)" name="width" value={width} onChange={setWidth} autoComplete="off" helpText="Enter width with units (e.g., 400px, 90%). Default: 450px." />
+                      <TextField label="Height (px or vh)" name="height" value={height} onChange={setHeight} autoComplete="off" helpText="Enter height with units (e.g., 600px, 70vh). Default: 70vh." />
+                      <TextField label="Z-index" name="zIndex" type="number" value={zIndex} onChange={setZIndex} autoComplete="off" error={formErrors.zIndex} helpText="Controls stacking order. Higher values appear on top. Default: 9999."/>
                       <ChoiceList title="Position" name="position" choices={positionOptions} selected={Array.isArray(position) ? position : [position]} onChange={(selected) => setPosition(selected)} />
                     </FormLayout.Group>
                   </FormLayout>
                 </BlockStack>
               </Card>
 
-              <Card roundedAbove="sm">
-                <BlockStack gap="500">
-                  <FormLayout>
-                    <FormLayout.Group title="Widget Colors">
-                      <TextField label="Background Color (Hex)" name="bgColor" value={bgColor} onChange={setBgColor} autoComplete="off" />
-                      <TextField label="Text Color (Hex)" name="textColor" value={textColor} onChange={setTextColor} autoComplete="off" />
-                      <TextField label="Button Color (Hex)" name="buttonColor" value={buttonColor} onChange={setButtonColor} autoComplete="off" />
+              <Card>
+                <BlockStack gap="300" padding="400"> {/* Padding for Card content if header is used */}
+                    <div style={{display: 'flex', justifyContent: 'space-between', cursor: 'pointer'}} onClick={handleToggleColors}>
+                        <PolarisText variant="headingMd" as="h2">Widget Colors</PolarisText>
+                        <Button variant="plain" icon={isColorsOpen ? "ChevronUpMinor" : "ChevronDownMinor"} ariaExpanded={isColorsOpen} ariaControls="colors-collapsible" />
+                    </div>
+                    <Collapsible open={isColorsOpen} id="colors-collapsible">
+                        <FormLayout>
+                            <PolarisText tone="subdued" as="p" >Enter valid CSS colors (e.g., #RRGGBB, rgba(r,g,b,a), 'red').</PolarisText>
+                            <FormLayout.Group>
+                                <TextField label="Background Color (Hex)" name="bgColor" value={bgColor} onChange={setBgColor} autoComplete="off" />
+                                <TextField label="Text Color (Hex)" name="textColor" value={textColor} onChange={setTextColor} autoComplete="off" />
+                                <TextField label="Button Color (Hex)" name="buttonColor" value={buttonColor} onChange={setButtonColor} autoComplete="off" />
+                            </FormLayout.Group>
+                            <FormLayout.Group title="Header Colors">
+                                <TextField label="Header Background Color (Hex)" name="headerBgColor" value={headerBgColor} onChange={setHeaderBgColor} autoComplete="off" />
+                                <TextField label="Header Text Color (Hex)" name="headerTextColor" value={headerTextColor} onChange={setHeaderTextColor} autoComplete="off" />
+                            </FormLayout.Group>
+                            <FormLayout.Group title="Message Colors">
+                                <TextField label="User Message Background (Hex)" name="userMsgBgColor" value={userMsgBgColor} onChange={setUserMsgBgColor} autoComplete="off" />
+                                <TextField label="User Message Text (Hex)" name="userMsgTextColor" value={userMsgTextColor} onChange={setUserMsgTextColor} autoComplete="off" />
+                                <TextField label="Assistant Message Background (Hex)" name="assistantMsgBgColor" value={assistantMsgBgColor} onChange={setAssistantMsgBgColor} autoComplete="off" />
+                                <TextField label="Assistant Message Text (Hex)" name="assistantMsgTextColor" value={assistantMsgTextColor} onChange={setAssistantMsgTextColor} autoComplete="off" />
+                            </FormLayout.Group>
+                        </FormLayout>
+                    </Collapsible>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+
+            <Layout.Section variant="oneThird">
+              <BlockStack gap="500">
+                <Card roundedAbove="sm">
+                    <BlockStack gap="500">
+                        <FormLayout>
+                            <FormLayout.Group title="Chat Bubble">
+                                <Select label="Chat Bubble Icon" name="chatBubbleIcon" options={chatBubbleIconOptions} value={chatBubbleIcon} onChange={handleChatBubbleIconChange} />
+                                {chatBubbleIcon === 'custom' && (
+                                <TextField
+                                  label="Custom Chat Bubble SVG"
+                                  name="customChatBubbleSVG"
+                                  value={customChatBubbleSVG}
+                                  onChange={setCustomChatBubbleSVG}
+                                  multiline={4}
+                                  autoComplete="off"
+                                  helpText="Paste valid SVG code. Ensure it's sized and uses `currentColor` for fill to inherit color."
+                                />
+                                )}
+                                <TextField
+                                  label="Chat Bubble Size (px)"
+                                  name="chatBubbleSize"
+                                  value={chatBubbleSize}
+                                  onChange={setChatBubbleSize}
+                                  autoComplete="off"
+                                  helpText="Size of the chat bubble button (e.g., 60px)."
+                                />
+                                <TextField label="Chat Bubble Color (Hex)" name="chatBubbleColor" value={chatBubbleColor} onChange={setChatBubbleColor} autoComplete="off" />
+                                <TextField label="Assistant Avatar URL" name="avatarUrl" value={avatarUrl} onChange={setAvatarUrl} autoComplete="off" helpText="URL for the assistant's avatar image."/>
+                            </FormLayout.Group>
+                        </FormLayout>
+                    </BlockStack>
+                </Card>
+                <Card roundedAbove="sm">
+                    <BlockStack gap="500">
+                        <FormLayout>
+                            <FormLayout.Group title="Product Display">
+                                <Select label="Product Display Mode" name="productDisplayMode" options={productDisplayModeOptions} value={productDisplayMode} onChange={handleProductDisplayModeChange} />
+                                <TextField label="Max Products to Display" name="maxProductsToDisplay" type="number" value={maxProductsToDisplay} onChange={setMaxProductsToDisplay} autoComplete="off" error={formErrors.maxProductsToDisplay} />
+                                <TextField label="Carousel Item Width (px)" name="carouselItemWidth" value={carouselItemWidth} onChange={setCarouselItemWidth} autoComplete="off" />
+                            </FormLayout.Group>
+                        </FormLayout>
+                    </BlockStack>
+                </Card>
+                 <Card>
+                    <BlockStack gap="300" padding="400">
+                         <div style={{display: 'flex', justifyContent: 'space-between', cursor: 'pointer'}} onClick={handleToggleAdvanced}>
+                            <PolarisText variant="headingMd" as="h2">Advanced Customization</PolarisText>
+                            <Button variant="plain" icon={isAdvancedOpen ? "ChevronUpMinor" : "ChevronDownMinor"} ariaExpanded={isAdvancedOpen} ariaControls="advanced-collapsible" />
+                        </div>
+                        <Collapsible open={isAdvancedOpen} id="advanced-collapsible">
+                            <FormLayout>
+                                <FormLayout.Group>
+                                    <TextField
+                                      label="Custom CSS Overrides"
+                                      name="customCSS"
+                                      value={customCSS}
+                                      onChange={setCustomCSS}
+                                      multiline={6}
+                                      autoComplete="off"
+                                      helpText="Apply custom CSS. Prefix selectors with your widget's main class/ID to scope styles. Use with caution."
+                                    />
+                                </FormLayout.Group>
+                            </FormLayout>
+                        </Collapsible>
+                    </BlockStack>
+                </Card>
+              </BlockStack>
+            </Layout.Section>
+          </Layout>
+          <Layout>
+            <Layout.Section>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingBlockStart: 'var(--p-space-400)' }}>
+                    <Button submit primary loading={isSubmitting}>
+                        Save UI Settings
+                    </Button>
+                </div>
+            </Layout.Section>
+          </Layout>
+        </BlockStack>
+      </RemixForm>
+      <SystemPromptHelpModal active={systemPromptHelpModalOpen} onClose={toggleSystemPromptHelpModal} />
+    </Page>
+  );
+}
+
+const SystemPromptHelpModal = ({ active, onClose }) => (
+  <Modal
+    open={active}
+    onClose={onClose}
+    title="Understanding System Prompts"
+    primaryAction={{ content: 'Got it!', onAction: onClose }}
+  >
+    <Modal.Section>
+      <BlockStack gap="400">
+        <PolarisText as="p">
+          The system prompt is a crucial piece of instruction you provide to the AI to guide its personality, tone, aversions, and overall behavior. It sets the context for the entire conversation.
+        </PolarisText>
+        <PolarisText as="h3" variant="headingSm">Key Considerations:</PolarisText>
+        <ul style={{margin: '0 var(--p-space-400)', paddingLeft: 'var(--p-space-400)'}}>
+          <li><strong>Clarity and Specificity:</strong> Be as clear and specific as possible. Ambiguous instructions can lead to unpredictable AI responses.</li>
+          <li><strong>Persona Definition:</strong> Define the persona you want the AI to adopt (e.g., "You are a friendly and helpful store assistant named Sparky.").</li>
+          <li><strong>Tone of Voice:</strong> Specify the desired tone (e.g., "Your tone should be enthusiastic and positive.").</li>
+          <li><strong>Task and Goals:</strong> Outline what the AI should primarily help users with (e.g., "Your main goal is to help users find products and answer questions about our store.").</li>
+          <li><strong>Constraints/Aversions:</strong> Specify what the AI should avoid doing or saying (e.g., "Do not make up product information. If you don't know an answer, say so politely.").</li>
+          <li><strong>Formatting (Optional):</strong> You can sometimes suggest how the AI should format its responses, like using bullet points for lists.</li>
+        </ul>
+        <PolarisText as="h3" variant="headingSm">Example Snippet (for a helpful clothing store assistant):</PolarisText>
+        <PolarisText as="p" tone="subdued">
+          "You are a cheerful and knowledgeable fashion advisor for 'Chic Boutique'. Your goal is to help users discover items they'll love, provide styling tips, and answer questions about materials, fit, and shipping. Always maintain a positive and encouraging tone. Do not discuss competitor pricing. If a product is out of stock, suggest similar alternatives."
+        </PolarisText>
+        <PolarisText as="p">
+          When you select "Custom" from the dropdown, you can write your own detailed prompt in the text area that appears. Experiment to find what works best for your brand!
+        </PolarisText>
+      </BlockStack>
+    </Modal.Section>
+  </Modal>
+);
                     </FormLayout.Group>
                     <FormLayout.Group title="Header Colors">
                       <TextField label="Header Background Color (Hex)" name="headerBgColor" value={headerBgColor} onChange={setHeaderBgColor} autoComplete="off" />
