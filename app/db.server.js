@@ -56,7 +56,7 @@ function decrypt(text) {
 }
 
 const defaultShopChatbotConfig = {
-  llmProvider: null,
+  llmProvider: "gemini", // Updated to match schema default
   geminiApiKey: null,
   claudeApiKey: null,
   botName: "Store Assistant",
