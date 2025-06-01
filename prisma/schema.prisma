@@ -123,6 +123,13 @@ model ShopChatbotConfig {
   chatBubbleSize          String?   @default("60px")
   chatBubbleColor         String?   @default("#E57399")
 
+  // UTM Parameters for link generation
+  utmSource               String?
+  utmMedium               String?
+  utmCampaign             String?
+  utmTerm                 String?
+  utmContent              String?
+
   // Timestamps (existing)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
@@ -138,4 +145,30 @@ model ChatInteractionLog {
 
   @@index([shop, timestamp]) // Index for querying logs by shop and time
   @@index([conversationId])  // Index for querying logs by conversation
+}
+
+model PromotionalMessage {
+  id             String   @id @default(cuid())
+  shop           String
+  message        String   @db.Text // Potentially long messages
+  triggerType    String   // e.g., "FIRST_VISIT", "CART_ABANDONMENT_ATTEMPT", "PAGE_URL", "TIME_ON_SITE"
+  triggerValue   String?  // e.g., URL pattern for PAGE_URL, number of seconds for TIME_ON_SITE
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shop, isActive])
+}
+
+model PromotionalProduct {
+  id             String   @id @default(cuid())
+  shop           String
+  productId      String   // Shopify Product GID, e.g., "gid://shopify/Product/12345"
+  triggerType    String   // e.g., "RELATED_CATEGORY", "ON_CART_PAGE", "TIME_CAMPAIGN"
+  triggerValue   String?  // e.g., category name, campaign name
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shop, isActive])
 }

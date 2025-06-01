@@ -24,6 +24,7 @@ export default function App() {
         </Link>
         <Link to="/app/settings/ai">AI Settings</Link>
         <Link to="/app/settings/ui">UI Settings</Link>
+        <Link to="/app/settings/marketing">Marketing Settings</Link>
       </NavMenu>
       <Outlet />
       <footer style={{ textAlign: 'center', padding: '20px' }}>

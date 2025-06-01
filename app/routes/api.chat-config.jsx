@@ -1,5 +1,9 @@
 import { json } from "@remix-run/node";
-import { getShopChatbotConfig } from "../db.server.js"; // Assuming db.server.js is in the app root
+import {
+  getShopChatbotConfig,
+  getPromotionalMessages,
+  getPromotionalProducts
+} from "../db.server.js"; // Assuming db.server.js is in the app root
 
 // Helper to add CORS headers
 function getCorsHeaders(requestOrigin) {
@@ -52,9 +56,22 @@ export async function loader({ request }) {
       );
     }
 
+    const fullConfig = await getShopChatbotConfig(shopDomain);
+
+    if (!fullConfig || fullConfig.error) {
+      const errorMessage = fullConfig && fullConfig.error ? fullConfig.error : "Configuration not found for this shop.";
+      return json(
+        { error: errorMessage },
+        { status: 404, headers: getCorsHeaders(requestOrigin) }
+      );
+    }
+
+    const activeMessages = await getPromotionalMessages(shopDomain, true);
+    const activeProducts = await getPromotionalProducts(shopDomain, true);
+
     // Sanitize: Select only public-safe fields
     const publicConfig = {
-      shopDomain: shopDomain, // Add shopDomain to the public config
+      shopDomain: shopDomain,
       // llmProvider: fullConfig.llmProvider, // Client likely doesn't need to know this directly
       botName: fullConfig.botName,
       welcomeMessage: fullConfig.welcomeMessage,
@@ -82,6 +99,17 @@ export async function loader({ request }) {
       customChatBubbleSVG: fullConfig.customChatBubbleSVG,
       chatBubbleSize: fullConfig.chatBubbleSize,
       chatBubbleColor: fullConfig.chatBubbleColor,
+
+      // Marketing Settings
+      utmConfig: {
+        source: fullConfig.utmSource || null,
+        medium: fullConfig.utmMedium || null,
+        campaign: fullConfig.utmCampaign || null,
+        term: fullConfig.utmTerm || null,
+        content: fullConfig.utmContent || null,
+      },
+      promotionalMessages: activeMessages || [],
+      promotionalProducts: activeProducts || [],
       // DO NOT include: geminiApiKey, claudeApiKey, or other sensitive internal fields
     };
 

@@ -63,6 +63,13 @@ const defaultShopChatbotConfig = {
   welcomeMessage: "👋 Hi there! How can I help you today?",
   systemPromptKey: "standardAssistant",
   customSystemPrompt: null,
+  // UTM Default Values
+  utmSource: null,
+  utmMedium: null,
+  utmCampaign: null,
+  utmTerm: null,
+  utmContent: null,
+  // UI Defaults
   width: "450px",
   height: "70vh",
   zIndex: "9999",
@@ -128,6 +135,9 @@ export async function updateShopChatbotConfig(shop, data) {
   const {
     llmProvider, geminiApiKey, claudeApiKey,
     botName, welcomeMessage, systemPromptKey, customSystemPrompt,
+    // UTM Params
+    utmSource, utmMedium, utmCampaign, utmTerm, utmContent,
+    // UI Params
     width, height, zIndex, position, bgColor, textColor, buttonColor,
     headerBgColor, headerTextColor, userMsgBgColor, userMsgTextColor,
     assistantMsgBgColor, assistantMsgTextColor, customCSS, avatarUrl,
@@ -137,7 +147,7 @@ export async function updateShopChatbotConfig(shop, data) {
 
   const dataToUpsert = {
     // LLM and API Keys
-    llmProvider: llmProvider !== undefined ? llmProvider : null,
+    llmProvider: llmProvider !== undefined ? llmProvider : defaultShopChatbotConfig.llmProvider,
     geminiApiKey: (geminiApiKey && typeof geminiApiKey === 'string') ? encrypt(geminiApiKey) : (geminiApiKey === '' || geminiApiKey === null ? null : undefined),
     claudeApiKey: (claudeApiKey && typeof claudeApiKey === 'string') ? encrypt(claudeApiKey) : (claudeApiKey === '' || claudeApiKey === null ? null : undefined),
 
@@ -146,6 +156,13 @@ export async function updateShopChatbotConfig(shop, data) {
     welcomeMessage: welcomeMessage !== undefined ? welcomeMessage : defaultShopChatbotConfig.welcomeMessage,
     systemPromptKey: systemPromptKey !== undefined ? systemPromptKey : defaultShopChatbotConfig.systemPromptKey,
     customSystemPrompt: customSystemPrompt !== undefined ? customSystemPrompt : defaultShopChatbotConfig.customSystemPrompt,
+
+    // UTM Parameters
+    utmSource: utmSource !== undefined ? utmSource : defaultShopChatbotConfig.utmSource,
+    utmMedium: utmMedium !== undefined ? utmMedium : defaultShopChatbotConfig.utmMedium,
+    utmCampaign: utmCampaign !== undefined ? utmCampaign : defaultShopChatbotConfig.utmCampaign,
+    utmTerm: utmTerm !== undefined ? utmTerm : defaultShopChatbotConfig.utmTerm,
+    utmContent: utmContent !== undefined ? utmContent : defaultShopChatbotConfig.utmContent,
 
     // Chat Widget Appearance & Positioning
     width: width !== undefined ? width : defaultShopChatbotConfig.width,
@@ -282,6 +299,185 @@ export async function getRecentChatInteractions(shop, limit = 5) {
   } catch (error) {
     console.error(`Error fetching recent chat interactions for shop ${shop}:`, error);
     return []; // Return empty array on error
+  }
+}
+
+
+// CRUD for PromotionalMessage
+export async function createPromotionalMessage(shop, data) {
+  if (!shop || !data || !data.message || !data.triggerType) {
+    throw new Error("Shop, message, and triggerType are required to create a promotional message.");
+  }
+  try {
+    return await prisma.promotionalMessage.create({
+      data: {
+        shop,
+        message: data.message,
+        triggerType: data.triggerType,
+        triggerValue: data.triggerValue, // Optional
+        isActive: data.isActive !== undefined ? data.isActive : true, // Default to true
+      },
+    });
+  } catch (error) {
+    console.error(`Error creating promotional message for shop ${shop}:`, error);
+    throw error; // Re-throw to be handled by caller
+  }
+}
+
+export async function getPromotionalMessages(shop, activeOnly = true) {
+  if (!shop) return [];
+  try {
+    const whereClause = { shop };
+    if (activeOnly) {
+      whereClause.isActive = true;
+    }
+    return await prisma.promotionalMessage.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (error) {
+    console.error(`Error fetching promotional messages for shop ${shop}:`, error);
+    return [];
+  }
+}
+
+export async function getPromotionalMessage(id, shop) {
+  if (!id || !shop) return null;
+  try {
+    return await prisma.promotionalMessage.findFirst({ // findFirst to include shop in where
+      where: { id, shop },
+    });
+  } catch (error) {
+    console.error(`Error fetching promotional message ${id} for shop ${shop}:`, error);
+    return null;
+  }
+}
+
+export async function updatePromotionalMessage(id, shop, data) {
+  if (!id || !shop || !data) {
+    throw new Error("ID, shop, and data are required to update a promotional message.");
+  }
+  try {
+    // First verify the message belongs to the shop
+    const message = await prisma.promotionalMessage.findFirst({ where: { id, shop } });
+    if (!message) {
+      throw new Error(`Promotional message ${id} not found for shop ${shop}.`);
+    }
+    return await prisma.promotionalMessage.update({
+      where: { id }, // id is unique, shop check done above
+      data, // Pass through all fields from data
+    });
+  } catch (error) {
+    console.error(`Error updating promotional message ${id} for shop ${shop}:`, error);
+    throw error;
+  }
+}
+
+export async function deletePromotionalMessage(id, shop) {
+  if (!id || !shop) {
+    throw new Error("ID and shop are required to delete a promotional message.");
+  }
+  try {
+    // First verify the message belongs to the shop
+    const message = await prisma.promotionalMessage.findFirst({ where: { id, shop } });
+    if (!message) {
+      throw new Error(`Promotional message ${id} not found for shop ${shop}.`);
+    }
+    return await prisma.promotionalMessage.delete({
+      where: { id },
+    });
+  } catch (error) {
+    console.error(`Error deleting promotional message ${id} for shop ${shop}:`, error);
+    throw error;
+  }
+}
+
+// CRUD for PromotionalProduct
+export async function createPromotionalProduct(shop, data) {
+  if (!shop || !data || !data.productId || !data.triggerType) {
+    throw new Error("Shop, productId, and triggerType are required to create a promotional product.");
+  }
+  try {
+    return await prisma.promotionalProduct.create({
+      data: {
+        shop,
+        productId: data.productId,
+        triggerType: data.triggerType,
+        triggerValue: data.triggerValue, // Optional
+        isActive: data.isActive !== undefined ? data.isActive : true, // Default to true
+      },
+    });
+  } catch (error) {
+    console.error(`Error creating promotional product for shop ${shop}:`, error);
+    throw error;
+  }
+}
+
+export async function getPromotionalProducts(shop, activeOnly = true) {
+  if (!shop) return [];
+  try {
+    const whereClause = { shop };
+    if (activeOnly) {
+      whereClause.isActive = true;
+    }
+    return await prisma.promotionalProduct.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (error) {
+    console.error(`Error fetching promotional products for shop ${shop}:`, error);
+    return [];
+  }
+}
+
+export async function getPromotionalProduct(id, shop) {
+  if (!id || !shop) return null;
+  try {
+    return await prisma.promotionalProduct.findFirst({ // findFirst to include shop in where
+      where: { id, shop },
+    });
+  } catch (error) {
+    console.error(`Error fetching promotional product ${id} for shop ${shop}:`, error);
+    return null;
+  }
+}
+
+export async function updatePromotionalProduct(id, shop, data) {
+  if (!id || !shop || !data) {
+    throw new Error("ID, shop, and data are required to update a promotional product.");
+  }
+  try {
+     // First verify the product promotion belongs to the shop
+    const productPromo = await prisma.promotionalProduct.findFirst({ where: { id, shop } });
+    if (!productPromo) {
+      throw new Error(`Promotional product ${id} not found for shop ${shop}.`);
+    }
+    return await prisma.promotionalProduct.update({
+      where: { id },
+      data,
+    });
+  } catch (error) {
+    console.error(`Error updating promotional product ${id} for shop ${shop}:`, error);
+    throw error;
+  }
+}
+
+export async function deletePromotionalProduct(id, shop) {
+  if (!id || !shop) {
+    throw new Error("ID and shop are required to delete a promotional product.");
+  }
+  try {
+    // First verify the product promotion belongs to the shop
+    const productPromo = await prisma.promotionalProduct.findFirst({ where: { id, shop } });
+    if (!productPromo) {
+      throw new Error(`Promotional product ${id} not found for shop ${shop}.`);
+    }
+    return await prisma.promotionalProduct.delete({
+      where: { id },
+    });
+  } catch (error) {
+    console.error(`Error deleting promotional product ${id} for shop ${shop}:`, error);
+    throw error;
   }
 }
 
