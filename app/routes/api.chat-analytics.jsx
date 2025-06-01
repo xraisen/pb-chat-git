@@ -28,93 +28,113 @@ export async function action({ request }) {
     // but are still valuable overall metrics.
     // We will increment totalInteractions for events that signify active engagement.
 
-    const genericEngagementEvents = [
-        'chatWidgetOpened',
-        'chatWidgetClosed',
-        'messageSent',
-        'messageReceived', // Assuming this means a bot response was fully generated and displayed
-        'quickReplyClicked',
-        'customerAuthenticated',
-        // 'productInteractionCount' // This key seems too generic. Using specific product events.
+    // We will increment totalInteractions for events that signify active engagement.
+    // Some events might only have a total counter and not a daily one if daily trend isn't critical.
+
+    // Unified handling for events that contribute to total interactions and have their own main counter.
+    // Specific daily counters or sorted set updates will be handled in the switch.
+    const eventsToTrack = [
+        'chatInitialized', 'chatWidgetOpened', 'chatWidgetClosed',
+        'messageSent', 'messageReceived',
+        'quickReplyClicked', 'customerAuthenticated',
+        'addToCart', // Renamed from addToCartClicked for consistency with analytics config
+        'checkoutInitiated',
+        'productCardClickedInChat', // Specific click on a product card
+        'productInteraction', // Generic product interaction
+        'productResultsDisplayed', 'errorDisplayed', 'authenticationAttempted',
+        'customButtonClicked', // If sent from client for custom interactive buttons
+        // 'userFeedback' // userFeedback handled separately due to hincrby
     ];
 
-    if (genericEngagementEvents.includes(eventType)) {
-      await redis.incr(`analytics:${shopId}:${eventType}`);
-      await redis.incr(`analytics:${shopId}:totalInteractions`);
-      await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
-      // Specific daily counters if needed, e.g., for messageSent:
-      if (eventType === 'messageSent') {
-        await redis.incr(`analytics:${shopId}:messageSent:${today}`);
-      }
+    if (eventsToTrack.includes(eventType)) {
+        // Use event: prefix for events that are explicitly user actions or client-side generated,
+        // and direct names for more general lifecycle/metrics.
+        // The loader in app.chatbot-analytics.jsx uses `event:addToCartClicked` etc.
+        // Let's ensure keys here match what the loader expects or simplify.
+        // For now, using `eventType` directly for main counter, and `event:${eventType}` for loader compatibility if needed.
+        // The loader was: analyticsData.addToCartCount = parseInt(await redis.get(`analytics:${shopId}:event:addToCartClicked`) || '0');
+        // To match that, we'd need to be specific.
+        // Let's use a mapping for keys that loader expects with 'event:' prefix.
+
+        const loaderKeyMap = {
+            'addToCart': `event:addToCart`, // Client sends 'addToCart', loader looks for 'event:addToCart' (or 'event:addToCartClicked')
+            'checkoutInitiated': `event:checkoutInitiated`,
+            'productCardClickedInChat': `event:productCardClickedInChat`,
+            'quickReplyClicked': `event:quickReplyClicked`,
+            'customerAuthenticated': `event:customerAuthenticated`,
+            'productInteraction': `event:productInteraction`
+        };
+        const redisKeyForEventType = loaderKeyMap[eventType] || eventType;
+        await redis.incr(`analytics:${shopId}:${redisKeyForEventType}`);
+
+        // Increment total interactions and daily total interactions for most of these
+        if (eventType !== 'chatInitialized') { // chatInitialized might not be a "user interaction"
+             await redis.incr(`analytics:${shopId}:totalInteractions`);
+             await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
+        }
     }
 
+
     switch (eventType) {
-      case 'chatInitialized': // This might be a page load event, not direct interaction
-        await redis.incr(`analytics:${shopId}:chatInitialized`);
-        // Optionally, don't count this in totalInteractions if it's just a load event
+      case 'chatInitialized':
+        // Already incremented `analytics:${shopId}:chatInitialized` if in eventsToTrack
+        // No daily total interaction for this one usually.
         break;
 
-      // Generic events are handled above, specific logic below if needed:
-      case 'addToCartClicked': // Specific key from standalone-chat-logic.js
-        await redis.incr(`analytics:${shopId}:event:addToCartClicked`); // Use the eventType directly as key component
-        await redis.incr(`analytics:${shopId}:totalInteractions`);
-        await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
+      case 'messageSent':
+        await redis.incr(`analytics:${shopId}:messageSent:${today}`);
+        break;
+
+      case 'chatWidgetOpened':
+        await redis.incr(`analytics:${shopId}:chatWidgetOpened:${today}`);
+        break;
+
+      // Events that were in `genericEngagementEvents` and also need specific handling (like ZSETs)
+      // or whose keys need to match the loader specifically.
+      case 'addToCart': // Client sends 'addToCart', loader expects 'event:addToCart'
+        // Main counter `analytics:${shopId}:event:addToCart` incremented by eventsToTrack logic
         if (eventData?.productId) {
           await redis.zincrby(`analytics:${shopId}:productAddToCartFrequency`, 1, String(eventData.productId));
         }
         break;
 
-      case 'checkoutInitiated': // Example of a more specific conversion event
-        await redis.incr(`analytics:${shopId}:event:checkoutInitiated`);
-        await redis.incr(`analytics:${shopId}:totalInteractions`);
-        await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
+      case 'checkoutInitiated':
+        // Main counter `analytics:${shopId}:event:checkoutInitiated` incremented by eventsToTrack logic
         break;
 
-      case 'productCardClickedInChat': // Or productViewed, etc.
-        await redis.incr(`analytics:${shopId}:event:productCardClickedInChat`);
-        await redis.incr(`analytics:${shopId}:totalInteractions`);
-        await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
+      case 'productCardClickedInChat':
+        // Main counter `analytics:${shopId}:event:productCardClickedInChat` incremented by eventsToTrack logic
         if (eventData?.productId) {
           await redis.zincrby(`analytics:${shopId}:productViewFrequency`, 1, String(eventData.productId));
         }
         break;
 
-      case 'productInteraction': // A more generic product interaction from config
-        await redis.incr(`analytics:${shopId}:event:productInteraction`);
-        await redis.incr(`analytics:${shopId}:totalInteractions`);
-        await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
-        if (eventData?.productId && eventData?.interactionType === 'view') { // Example detail
+      case 'productInteraction':
+        // Main counter `analytics:${shopId}:event:productInteraction` incremented by eventsToTrack logic
+        if (eventData?.productId && eventData?.interactionType === 'view') {
             await redis.zincrby(`analytics:${shopId}:productViewFrequency`, 1, String(eventData.productId));
         }
         break;
 
       case 'userFeedback':
-        // Assuming feedback itself isn't a primary "interaction" like sending a message,
-        // but you might still want to log its occurrence.
-        // If it should count towards total interactions, uncomment below:
-        // await redis.incr(`analytics:${shopId}:totalInteractions`);
-        // await redis.incr(`analytics:${shopId}:totalInteractions:${today}`);
+        // This event type doesn't use a simple incr, so it's handled entirely here.
+        // Not counted in totalInteractions unless desired.
         if (eventData?.rating === 'up' || eventData?.rating === 'thumbsUp') {
           await redis.hincrby(`analytics:${shopId}:feedback`, 'thumbsUp', 1);
         } else if (eventData?.rating === 'down' || eventData?.rating === 'thumbsDown') {
           await redis.hincrby(`analytics:${shopId}:feedback`, 'thumbsDown', 1);
         } else {
           console.warn(`Invalid feedback rating for ${shopId}: ${eventData?.rating}`);
-          // Optionally return a 400 if rating is mandatory and invalid
           return json({ error: "Invalid feedback rating provided" }, { status: 400, headers: corsHeaders(request) });
         }
         break;
 
-      // Add cases for other genericEngagementEvents if they need more than just the generic incr logic
-      // For example, 'messageSent' is already handled by generic and its specific daily counter.
-
       default:
-        // If eventType was not one of the genericEngagementEvents and not specifically handled above
-        if (!genericEngagementEvents.includes(eventType) && eventType !== 'chatInitialized') {
+        if (!eventsToTrack.includes(eventType)) {
             console.warn(`Unknown or unhandled analytics event type for ${shopId}: ${eventType}`);
             return json({ error: "Unknown or unhandled event type" }, { status: 400, headers: corsHeaders(request) });
         }
-        // If it was a genericEngagementEvent, it's already processed.
+        // If it was in eventsToTrack, its main counter and totalInteractions (if applicable) are already handled.
         break;
     }
 
