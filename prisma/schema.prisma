@@ -94,6 +94,8 @@ model ShopChatbotConfig {
   welcomeMessage          String?   @default("👋 Hi there! How can I help you today?")
   systemPromptKey         String?   @default("standardAssistant") // Key for a predefined prompt
   customSystemPrompt      String?   @db.Text // For potentially longer custom prompts
+  promptHeadOverride      String?   @db.Text // For prepending to the final system prompt
+  promptTailOverride      String?   @db.Text // For appending to the final system prompt
 
   // Chat Widget Appearance & Positioning
   width                   String?   @default("450px")
