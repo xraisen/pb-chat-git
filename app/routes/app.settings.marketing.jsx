@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-  Page, Layout, Card, FormLayout, TextField, Select, Button, Checkbox, BlockStack, Text, Modal, List, LegacyStack, Icon, Banner,
+  Page, Layout, Card, FormLayout, TextField, Select, Button, Checkbox, BlockStack, Text, Modal, List, LegacyStack, Icon, Banner, // Removed Tooltip, InfoMinor as they are not used. Kept Icon for Edit/Delete.
 } from '@shopify/polaris';
 import { TitleBar } from "@shopify/app-bridge-react";
 import { json, redirect } from "@remix-run/node";
+// import { InfoMinor } from '@shopify/polaris-icons'; // Not used
 import { authenticate } from "../../shopify.server";
 import {
   getShopChatbotConfig,
@@ -160,8 +161,8 @@ export default function MarketingSettingsPage() {
 
   // UTM States
   const [utmSettings, setUtmSettings] = useState(loadedUtm || defaultUtmSettings);
-  // Update UTM state if loader data changes (e.g., after save)
-  useState(() => { // Using a simple effect-like behavior with useState's initializer
+
+  useEffect(() => {
     setUtmSettings(loadedUtm || defaultUtmSettings);
   }, [loadedUtm]);
 
@@ -179,23 +180,43 @@ export default function MarketingSettingsPage() {
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [currentProductData, setCurrentProductData] = useState(defaultProductData);
-  const MOCK_PROMOTIONAL_PRODUCTS = loadedProducts && loadedProducts.length > 0 ? loadedProducts : [ // Use loaded if available
-    { id: 'prod1', productId: 'gid://shopify/Product/123', name: 'Awesome T-Shirt (Mock)', triggerType: 'RELATED_CATEGORY', triggerValue: 'Apparel', isActive: true },
-  ];
+  // loadedProducts will be used directly for rendering.
 
-
-  const triggerTypeOptions = [
+  const triggerTypeOptionsMessages = [
     { label: 'First Visit', value: 'FIRST_VISIT' },
-    { label: 'Cart Abandonment Attempt', value: 'CART_ABANDONMENT_ATTEMPT' }, // User is about to leave the site
-    { label: 'Page URL Contains', value: 'PAGE_URL' }, // Specific URL or path
-    { label: 'Time on Site (seconds)', value: 'TIME_ON_SITE' }, // e.g., after 60 seconds
+    { label: 'Cart Abandonment Attempt', value: 'CART_ABANDONMENT_ATTEMPT' },
+    { label: 'Page URL Contains', value: 'PAGE_URL' },
+    { label: 'Time on Site (seconds)', value: 'TIME_ON_SITE' },
   ];
 
   const productTriggerTypeOptions = [
-    { label: 'Related to Category (Manual)', value: 'RELATED_CATEGORY' }, // Admin specifies a category string
-    { label: 'On Cart Page', value: 'ON_CART_PAGE' }, // When chat opened on cart page
-    { label: 'Time-based Campaign (Manual)', value: 'TIME_CAMPAIGN' }, // Admin specifies campaign name/dates
+    { label: 'Related to Category', value: 'RELATED_CATEGORY' },
+    { label: 'On Cart Page', value: 'ON_CART_PAGE' },
+    { label: 'Time-based Campaign', value: 'TIME_CAMPAIGN' },
   ];
+
+  const getTriggerValuePlaceholder = (triggerType, isProductContext = false) => {
+    switch (triggerType) {
+      case 'PAGE_URL': return 'e.g., /collections/sale';
+      case 'TIME_ON_SITE': return 'e.g., 60 (for seconds)';
+      case 'RELATED_CATEGORY': return 'e.g., Apparel';
+      case 'TIME_CAMPAIGN': return 'e.g., Summer2024';
+      default: return 'No value needed or specific format';
+    }
+  };
+
+  const getTriggerValueHelpText = (triggerType, isProductContext = false) => {
+    switch (triggerType) {
+      case 'PAGE_URL': return 'Enter a part of the URL or a full URL to match (e.g., /products/specific-item).';
+      case 'TIME_ON_SITE': return 'Message/product will appear after this many seconds on any page with the chat.';
+      case 'FIRST_VISIT': return 'No value needed. Triggers on user\'s very first visit.';
+      case 'CART_ABANDONMENT_ATTEMPT': return 'No value needed. Triggers if user tries to leave the browser window.';
+      case 'RELATED_CATEGORY': return `Enter a category name. The chatbot may use this to suggest products when discussing this category.`;
+      case 'ON_CART_PAGE': return 'No value needed. Triggers if chat is opened on the cart page.';
+      case 'TIME_CAMPAIGN': return 'Enter a campaign identifier (e.g., "SummerSale2024"). Logic for time-based activation is managed by how you use this tag server-side or in other systems.';
+      default: return 'Enter the value relevant for the selected trigger type.';
+    }
+  };
 
   // Handlers for Promotional Messages Modal
   const handleOpenNewMessageModal = useCallback(() => {
@@ -307,11 +328,11 @@ export default function MarketingSettingsPage() {
                 <BlockStack gap="300" padding="400">
                   <Text tone="subdued" as="p">Define default UTM parameters to be appended to product links shared by the chatbot.</Text>
                   <FormLayout>
-                    <TextField label="UTM Source" name="utmSource" value={utmSettings.utmSource} onChange={(val) => handleUtmChange(val, 'utmSource')} autoComplete="off" error={actionData?.errors?.utmSource} />
-                    <TextField label="UTM Medium" name="utmMedium" value={utmSettings.utmMedium} onChange={(val) => handleUtmChange(val, 'utmMedium')} autoComplete="off" error={actionData?.errors?.utmMedium} />
-                    <TextField label="UTM Campaign" name="utmCampaign" value={utmSettings.utmCampaign} onChange={(val) => handleUtmChange(val, 'utmCampaign')} autoComplete="off" error={actionData?.errors?.utmCampaign} />
-                    <TextField label="UTM Term" name="utmTerm" value={utmSettings.utmTerm} onChange={(val) => handleUtmChange(val, 'utmTerm')} autoComplete="off" error={actionData?.errors?.utmTerm} />
-                    <TextField label="UTM Content" name="utmContent" value={utmSettings.utmContent} onChange={(val) => handleUtmChange(val, 'utmContent')} autoComplete="off" error={actionData?.errors?.utmContent} />
+                    <TextField label="UTM Source" name="utmSource" value={utmSettings.utmSource} onChange={(val) => handleUtmChange(val, 'utmSource')} autoComplete="off" error={actionData?.errors?.utmSource} helpText="e.g., 'chatbot', 'google', 'newsletter'" />
+                    <TextField label="UTM Medium" name="utmMedium" value={utmSettings.utmMedium} onChange={(val) => handleUtmChange(val, 'utmMedium')} autoComplete="off" error={actionData?.errors?.utmMedium} helpText="e.g., 'ai-chat', 'cpc', 'email'" />
+                    <TextField label="UTM Campaign" name="utmCampaign" value={utmSettings.utmCampaign} onChange={(val) => handleUtmChange(val, 'utmCampaign')} autoComplete="off" error={actionData?.errors?.utmCampaign} helpText="e.g., 'winter_sale', 'product_launch'" />
+                    <TextField label="UTM Term" name="utmTerm" value={utmSettings.utmTerm} onChange={(val) => handleUtmChange(val, 'utmTerm')} autoComplete="off" error={actionData?.errors?.utmTerm} helpText="Identify paid keywords, e.g., 'running_shoes' (optional)." />
+                    <TextField label="UTM Content" name="utmContent" value={utmSettings.utmContent} onChange={(val) => handleUtmChange(val, 'utmContent')} autoComplete="off" error={actionData?.errors?.utmContent} helpText="Differentiate ads or links pointing to the same URL, e.g., 'logolink' or 'textlink' (optional)." />
                   </FormLayout>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 'var(--p-space-400)'}}>
                     <Button submit primary loading={isSaving}>Save UTM Settings</Button>
@@ -324,8 +345,7 @@ export default function MarketingSettingsPage() {
 
         <Layout.Section>
           <Card title="Promotional Messages">
-            <div style={{padding: 'var(--p-space-400)'}}>
-                <BlockStack gap="300">
+            <BlockStack gap="300" padding="400"> {/* Standardized padding */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button onClick={handleOpenNewMessageModal} primary>Add New Message</Button>
                 </div>
@@ -357,34 +377,32 @@ export default function MarketingSettingsPage() {
 
         <Layout.Section>
           <Card title="Promotional Products">
-             <div style={{padding: 'var(--p-space-400)'}}>
-                <BlockStack gap="300">
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <Button onClick={handleOpenNewProductModal} primary>Add Promotional Product</Button>
-                    </div>
-                    {MOCK_PROMOTIONAL_PRODUCTS && MOCK_PROMOTIONAL_PRODUCTS.length > 0 ? ( // Using mock for now
-                    <List>
-                        {MOCK_PROMOTIONAL_PRODUCTS.map((prod) => (
-                        <List.Item key={prod.id}>
-                            <LegacyStack distribution="equalSpacing" alignment="center">
-                                <BlockStack gap="100">
-                                    <Text variant="bodyMd" fontWeight="bold">{prod.name || prod.productId}</Text>
-                                    <Text tone="subdued">Trigger: {prod.triggerType} {prod.triggerValue ? `(${prod.triggerValue})` : ''}</Text>
-                                </BlockStack>
-                                <LegacyStack alignment="center" spacing="tight">
-                                    <Text>{prod.isActive ? "Active" : "Inactive"}</Text>
-                                    <Button icon={EditIcon} accessibilityLabel="Edit product" onClick={() => handleOpenEditProductModal(prod)} />
-                                    <Button icon={DeleteIcon} accessibilityLabel="Delete product" destructive onClick={() => handleDeleteProduct(prod.id)} />
-                                </LegacyStack>
+            <BlockStack gap="300" padding="400"> {/* Standardized padding */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button onClick={handleOpenNewProductModal} primary>Add Promotional Product</Button>
+                </div>
+                {loadedProducts && loadedProducts.length > 0 ? (
+                <List>
+                    {loadedProducts.map((prod) => (
+                    <List.Item key={prod.id}>
+                        <LegacyStack distribution="equalSpacing" alignment="center">
+                            <BlockStack gap="100">
+                                <Text variant="bodyMd" fontWeight="bold">{prod.productId}{/* Product 'name' is not on the model yet */}</Text>
+                                <Text tone="subdued">Trigger: {prod.triggerType} {prod.triggerValue ? `(${prod.triggerValue})` : ''}</Text>
+                            </BlockStack>
+                            <LegacyStack alignment="center" spacing="tight">
+                                <Text>{prod.isActive ? "Active" : "Inactive"}</Text>
+                                <Button icon={EditIcon} accessibilityLabel="Edit product" onClick={() => handleOpenEditProductModal(prod)} />
+                                <Button icon={DeleteIcon} accessibilityLabel="Delete product" destructive onClick={() => handleDeleteProduct(prod.id)} />
                             </LegacyStack>
-                        </List.Item>
-                        ))}
-                    </List>
-                    ) : (
-                    <Text alignment="center" tone="subdued">No promotional products configured yet.</Text>
-                    )}
-                </BlockStack>
-            </div>
+                        </LegacyStack>
+                    </List.Item>
+                    ))}
+                </List>
+                ) : (
+                <Text alignment="center" tone="subdued">No promotional products configured yet.</Text>
+                )}
+            </BlockStack>
           </Card>
         </Layout.Section>
       </Layout>
@@ -403,9 +421,26 @@ export default function MarketingSettingsPage() {
                 <input type="hidden" name="_action" value={editingMessage ? "updateMessage" : "createMessage"} />
                 {editingMessage && <input type="hidden" name="messageId" value={editingMessage.id} />}
                 <TextField label="Message" name="message" value={currentMessageData.message} onChange={(val) => handleMessageDataChange(val, 'message')} multiline={4} autoComplete="off" error={actionData?.errors?.message} />
-                <Select label="Trigger Type" name="triggerType" options={triggerTypeOptions} value={currentMessageData.triggerType} onChange={(val) => handleMessageDataChange(val, 'triggerType')} error={actionData?.errors?.triggerType} />
+                <Select
+                  label="Trigger Type"
+                  name="triggerType"
+                  options={triggerTypeOptionsMessages}
+                  value={currentMessageData.triggerType}
+                  onChange={(val) => handleMessageDataChange(val, 'triggerType')}
+                  error={actionData?.errors?.triggerType}
+                  helpText="Determines when this message will be shown to the user."
+                />
                 {(currentMessageData.triggerType === 'PAGE_URL' || currentMessageData.triggerType === 'TIME_ON_SITE') && (
-                  <TextField label="Trigger Value" name="triggerValue" value={currentMessageData.triggerValue || ""} onChange={(val) => handleMessageDataChange(val, 'triggerValue')} autoComplete="off" helpText={currentMessageData.triggerType === 'PAGE_URL' ? 'e.g., /products/specific-item or part of URL' : 'e.g., 60 (for seconds on site)'} error={actionData?.errors?.triggerValue} />
+                  <TextField
+                    label="Trigger Value"
+                    name="triggerValue"
+                    value={currentMessageData.triggerValue || ""}
+                    onChange={(val) => handleMessageDataChange(val, 'triggerValue')}
+                    autoComplete="off"
+                    placeholder={getTriggerValuePlaceholder(currentMessageData.triggerType)}
+                    helpText={getTriggerValueHelpText(currentMessageData.triggerType)}
+                    error={actionData?.errors?.triggerValue}
+                  />
                 )}
                 <Checkbox label="Active" name="isActive" checked={currentMessageData.isActive} onChange={(val) => handleMessageDataChange(val, 'isActive')} />
               </FormLayout>
@@ -426,11 +461,36 @@ export default function MarketingSettingsPage() {
             <FormLayout>
                 <input type="hidden" name="_action" value={editingProduct ? "updateProduct" : "createProduct"} />
                 {editingProduct && <input type="hidden" name="promotionalProductId" value={editingProduct.id} />}
-                <TextField label="Shopify Product GID" name="productId" value={currentProductData.productId} onChange={(val) => handleProductDataChange(val, 'productId')} autoComplete="off" helpText="e.g., gid://shopify/Product/1234567890." error={actionData?.errors?.productId} />
+                <TextField
+                  label="Shopify Product GID"
+                  name="productId"
+                  value={currentProductData.productId}
+                  onChange={(val) => handleProductDataChange(val, 'productId')}
+                  autoComplete="off"
+                  helpText="Enter the Shopify Product GID (e.g., gid://shopify/Product/1234567890)."
+                  error={actionData?.errors?.productId}
+                />
                 {/* <Button onClick={() => console.log('ResourcePicker for Products to be implemented here using shopifyShop and shopifyApiKey from loaderData')}>Select Product with ResourcePicker</Button> */}
-                <Select label="Trigger Type" name="triggerType" options={productTriggerTypeOptions} value={currentProductData.triggerType} onChange={(val) => handleProductDataChange(val, 'triggerType')} error={actionData?.errors?.triggerType} />
-                {(currentProductData.triggerType === 'RELATED_CATEGORY' || currentProductData.triggerType === 'TIME_CAMPAIGN') && (
-                    <TextField label="Trigger Value" name="triggerValue" value={currentProductData.triggerValue || ""} onChange={(val) => handleProductDataChange(val, 'triggerValue')} autoComplete="off" helpText={currentProductData.triggerType === 'RELATED_CATEGORY' ? 'e.g., "Apparel" or "Summer Collection"' : 'e.g., "Holiday2024"'} error={actionData?.errors?.triggerValue} />
+                <Select
+                  label="Trigger Type"
+                  name="triggerType"
+                  options={productTriggerTypeOptions}
+                  value={currentProductData.triggerType}
+                  onChange={(val) => handleProductDataChange(val, 'triggerType')}
+                  error={actionData?.errors?.triggerType}
+                  helpText="Determines when this product will be suggested."
+                />
+                {(currentProductData.triggerType === 'RELATED_CATEGORY' || currentProductData.triggerType === 'TIME_CAMPAIGN' || currentProductData.triggerType === 'PAGE_URL' || currentProductData.triggerType === 'TIME_ON_SITE') && ( // Assuming these product triggers might also need a value
+                    <TextField
+                      label="Trigger Value"
+                      name="triggerValue"
+                      value={currentProductData.triggerValue || ""}
+                      onChange={(val) => handleProductDataChange(val, 'triggerValue')}
+                      autoComplete="off"
+                      placeholder={getTriggerValuePlaceholder(currentProductData.triggerType, true)}
+                      helpText={getTriggerValueHelpText(currentProductData.triggerType, true)}
+                      error={actionData?.errors?.triggerValue}
+                    />
                 )}
                 <Checkbox label="Active" name="isActive" checked={currentProductData.isActive} onChange={(val) => handleProductDataChange(val, 'isActive')} />
             </FormLayout>

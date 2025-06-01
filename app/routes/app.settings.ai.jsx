@@ -98,15 +98,16 @@ export default function AISettingsPage() {
         )}
         <Layout.Section>
           <Card>
-            <RemixForm method="post">
-              <FormLayout>
-                <Select
-                  label="LLM Provider"
+            <BlockStack gap="400" padding="400"> {/* Added BlockStack for padding and gap */}
+              <RemixForm method="post">
+                <FormLayout>
+                  <Select
+                    label="LLM Provider"
                   name="llmProvider"
                   options={llmProviderOptions}
                   onChange={handleLlmProviderChange}
                   value={llmProvider}
-                  helpText="Note: If you switch providers, ensure the corresponding API key below is saved."
+                  helpText="Choose your preferred Large Language Model provider. API keys for the selected provider must be configured below."
                 />
                 {llmProvider === 'gemini' && (
                   <TextField
@@ -116,7 +117,7 @@ export default function AISettingsPage() {
                     value={geminiApiKey}
                     onChange={handleGeminiApiKeyChange}
                     autoComplete="new-password"
-                    helpText="Leave blank to clear the key. Changes are saved on submit."
+                    helpText="Enter your Gemini API key. This is kept confidential. Leave blank if you do not want to use Gemini or to clear an existing key."
                   />
                 )}
                 {llmProvider === 'claude' && (
@@ -127,14 +128,15 @@ export default function AISettingsPage() {
                     value={claudeApiKey}
                     onChange={handleClaudeApiKeyChange}
                     autoComplete="new-password"
-                    helpText="Leave blank to clear the key. Changes are saved on submit."
+                    helpText="Enter your Claude API key. This is kept confidential. Leave blank if you do not want to use Claude or to clear an existing key."
                   />
                 )}
-                <Button submit primary loading={isSubmitting}>
-                  Save Settings
-                </Button>
-              </FormLayout>
-            </RemixForm>
+                  <Button submit primary loading={isSubmitting}>
+                    Save Settings
+                  </Button>
+                </FormLayout>
+              </RemixForm>
+            </BlockStack>
           </Card>
         </Layout.Section>
       </Layout>

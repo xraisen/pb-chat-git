@@ -10,8 +10,12 @@ import {
   Banner, // For displaying errors
   List,
   EmptyState, // For empty states in cards if needed
+  Tooltip, // Added
+  Icon,    // Added
+  LegacyStack // Added
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { InfoMinor } from '@shopify/polaris-icons'; // Added
 import {
   LineChart,
   Line,
@@ -74,13 +78,23 @@ export const loader = async ({ request }) => {
 export default function Index() {
   const { shopName, stats, recentInteractions, loaderError } = useLoaderData();
 
-  const renderStatCard = (title, value) => (
+  const renderStatCard = (title, value, helpText = null) => (
     <Card roundedAbove="sm" padding="400">
         <BlockStack gap="200">
-            <Text as="h2" variant="headingMd" tone="subdued">{title}</Text>
+            {typeof title === 'string' ? <Text as="h2" variant="headingMd" tone="subdued">{title}</Text> : title}
             <Text as="p" variant="headingLg">{value ?? '0'}</Text>
+            {helpText && <Text as="p" variant="bodySm" tone="subdued">{helpText}</Text>}
         </BlockStack>
     </Card>
+  );
+
+  const totalInteractionsTitle = (
+    <LegacyStack alignment="center" spacing="extraTight">
+      <Text as="h2" variant="headingMd" tone="subdued">Total Interactions</Text>
+      <Tooltip content="Sum of all logged events (messages, chat opens, tool calls, etc.).">
+        <Icon source={InfoMinor} tone="base" />
+      </Tooltip>
+    </LegacyStack>
   );
 
   if (loaderError) {
@@ -105,10 +119,10 @@ export default function Index() {
         <Layout>
           <Layout.Section>
             <Grid columns={{ xs: 1, sm: 2, md: 2, lg:4 }}>
-              {renderStatCard("Total Interactions", stats.totalInteractions)}
+              {renderStatCard(totalInteractionsTitle, stats.totalInteractions)}
               {renderStatCard("Chats Opened", stats.chatOpenedCount)}
-              {renderStatCard("Add to Carts (via Chat)", stats.addToCartCount)}
-              {renderStatCard("Checkouts Initiated (via Chat)", stats.checkoutsInitiatedCount)}
+              {renderStatCard("Add to Carts (via Chat)", stats.addToCartCount, "Logged when 'Add to Cart' is clicked on a product in chat.")}
+              {renderStatCard("Checkouts Initiated (via Chat)", stats.checkoutsInitiatedCount, "Logged when a checkout URL from a chat tool is generated.")}
             </Grid>
           </Layout.Section>
 
@@ -116,9 +130,10 @@ export default function Index() {
             <Card title="Chatbot Usage Trends">
               <BlockStack gap="400" padding="400">
                 {(stats.interactionsOverTime && stats.interactionsOverTime.length > 0) ? (
-                  <div style={{ width: '100%', height: 300 }}>
-                    <ResponsiveContainer>
-                      <LineChart
+                  <>
+                    <div style={{ width: '100%', height: 300 }}>
+                      <ResponsiveContainer>
+                        <LineChart
                         data={stats.interactionsOverTime}
                         margin={{
                           top: 5, right: 30, left: 0, bottom: 5, // Adjusted left margin
@@ -136,6 +151,8 @@ export default function Index() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <Text as="p" variant="bodySm" tone="subdued" alignment="center">Total logged chat interactions per day.</Text>
+                  </>
                 ) : (
                   <Text as="p" tone="subdued">Not enough data to display usage trends yet.</Text>
                 )}
