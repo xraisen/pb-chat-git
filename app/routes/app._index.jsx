@@ -22,7 +22,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip, // Aliased import
   Legend,
   ResponsiveContainer,
 } from 'recharts';
@@ -154,7 +154,7 @@ export default function Index() {
                           // tickFormatter={(tickItem) => new Date(tickItem).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         />
                         <YAxis allowDecimals={false} />
-                        <Tooltip />
+                        <RechartsTooltip /> {/* Updated usage */}
                         <Legend />
                         <Line type="monotone" dataKey="count" stroke="#8884d8" activeDot={{ r: 8 }} name="Interactions" />
                       </LineChart>
