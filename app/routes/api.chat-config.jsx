@@ -1,15 +1,15 @@
 import { json } from "@remix-run/node";
-import {
-  getShopChatbotConfig,
-  getPromotionalMessages,
-  getPromotionalProducts
+import { 
+  getShopChatbotConfig, 
+  getPromotionalMessages, 
+  getPromotionalProducts 
 } from "../db.server.js"; // Assuming db.server.js is in the app root
 
 // Helper to add CORS headers
 function getCorsHeaders(requestOrigin) {
   // Use requestOrigin if provided and valid, otherwise allow any for broader development/testing
   // In production, you'd want to restrict this to your actual storefront domain(s)
-  const allowedOrigin = requestOrigin || "*";
+  const allowedOrigin = requestOrigin || "*"; 
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -61,7 +61,7 @@ export async function loader({ request }) {
 
     // Sanitize: Select only public-safe fields
     const publicConfig = {
-      shopDomain: shopDomain,
+      shopDomain: shopDomain, 
       // llmProvider: fullConfig.llmProvider, // Client likely doesn't need to know this directly
       botName: fullConfig.botName,
       welcomeMessage: fullConfig.welcomeMessage,
@@ -89,7 +89,7 @@ export async function loader({ request }) {
       customChatBubbleSVG: fullConfig.customChatBubbleSVG,
       chatBubbleSize: fullConfig.chatBubbleSize,
       chatBubbleColor: fullConfig.chatBubbleColor,
-
+      
       // Marketing Settings
       utmConfig: {
         source: fullConfig.utmSource || null,

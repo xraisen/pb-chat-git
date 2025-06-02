@@ -10,34 +10,34 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const { shop } = session;
   // Use the new function name and expect the full config object or defaults
-  const shopConfig = await getShopChatbotConfig(shop);
-
+  const shopConfig = await getShopChatbotConfig(shop); 
+  
   if (shopConfig && shopConfig.error) {
     console.error("Error loading AI settings (ShopChatbotConfig):", shopConfig.error);
     // Return a default config but include an error message for the UI
-    return json({
-      llmProvider: 'gemini',
-      geminiApiKey: '',
-      claudeApiKey: '',
-      error: "Failed to load configuration. Please try again."
+    return json({ 
+      llmProvider: 'gemini', 
+      geminiApiKey: '', 
+      claudeApiKey: '', 
+      error: "Failed to load configuration. Please try again." 
     });
   }
-
+  
   // The getShopChatbotConfig now returns a comprehensive default object,
   // so we can directly return it.
   // The component will use `loaderData.fieldName ?? defaultValueFromComponent` for its state.
-  return json(shopConfig);
+  return json(shopConfig); 
 };
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const { shop } = session;
   const formData = await request.formData();
-
+  
   const llmProvider = formData.get('llmProvider');
   // Ensure API keys are passed as empty strings if not provided or explicitly cleared,
   // as updateAppConfiguration expects strings or null.
-  const geminiApiKey = formData.get('geminiApiKey') || "";
+  const geminiApiKey = formData.get('geminiApiKey') || ""; 
   const claudeApiKey = formData.get('claudeApiKey') || "";
   const errors = {};
 
@@ -54,10 +54,10 @@ export const action = async ({ request }) => {
 
   try {
     // Pass only the relevant fields for this form to updateShopChatbotConfig
-    await updateShopChatbotConfig(shop, {
-      llmProvider,
-      geminiApiKey,
-      claudeApiKey
+    await updateShopChatbotConfig(shop, { 
+      llmProvider, 
+      geminiApiKey, 
+      claudeApiKey 
     });
     // Optionally, you could return a success message via useActionData
     return redirect("/app/settings/ai", {

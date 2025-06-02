@@ -26,13 +26,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { authenticate } from "../../shopify.server";
-import {
-  getChatInteractionStats,
+import { authenticate } from "../../shopify.server"; 
+import { 
+  getChatInteractionStats, 
   getRecentChatInteractions,
   getMessageFeedbackStats,  // Added
   getRecentMessageFeedback // Added
-} from "../../db.server.js";
+} from "../../db.server.js"; 
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -44,15 +44,15 @@ export const loader = async ({ request }) => {
     const feedbackStats = await getMessageFeedbackStats(shop);
     const recentFeedbackWithComments = await getRecentMessageFeedback(shop, 5);
 
-    if (stats.error || feedbackStats.error) {
-        return json({
-            shopName: shop,
-            stats: stats.error ? {
-                totalInteractions: 0, chatOpenedCount: 0, addToCartCount: 0, checkoutsInitiatedCount: 0, interactionsOverTime: []
-            } : stats,
+    if (stats.error || feedbackStats.error) { 
+        return json({ 
+            shopName: shop, 
+            stats: stats.error ? { 
+                totalInteractions: 0, chatOpenedCount: 0, addToCartCount: 0, checkoutsInitiatedCount: 0, interactionsOverTime: [] 
+            } : stats, 
             recentInteractions: [],
-            feedbackStats: feedbackStats.error ? {
-                upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0
+            feedbackStats: feedbackStats.error ? { 
+                upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0 
             } : feedbackStats,
             recentFeedbackWithComments: [],
             loaderError: stats.error || feedbackStats.error || "Failed to load some dashboard data."
@@ -71,12 +71,12 @@ export const loader = async ({ request }) => {
     console.error("Error in dashboard loader:", error);
     return json({
       shopName: shop,
-      stats: {
+      stats: { 
         totalInteractions: 0, chatOpenedCount: 0, addToCartCount: 0, checkoutsInitiatedCount: 0, interactionsOverTime: []
       },
       recentInteractions: [],
-      feedbackStats: {
-        upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0
+      feedbackStats: { 
+        upvotes: 0, downvotes: 0, totalFeedback: 0, positiveFeedbackPercentage: 0 
       },
       recentFeedbackWithComments: [],
       loaderError: "Failed to load dashboard data.",
@@ -105,7 +105,7 @@ export default function Index() {
       </Tooltip>
     </LegacyStack>
   );
-
+  
   if (loaderError) {
     return (
         <Page>
@@ -149,8 +149,8 @@ export default function Index() {
                         }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
+                        <XAxis 
+                          dataKey="date" 
                           // tickFormatter={(tickItem) => new Date(tickItem).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         />
                         <YAxis allowDecimals={false} />
@@ -168,7 +168,7 @@ export default function Index() {
               </BlockStack>
             </Card>
           </Layout.Section>
-
+          
           <Layout.Section>
             <Card title="Recent Chat Interactions">
                 <BlockStack gap="400" padding="400">
@@ -251,7 +251,7 @@ export default function Index() {
                 ) : (
                   <EmptyState
                     heading="No comments yet"
-                    image="https://cdn.shopify.com/s/files/1/0262/4074/files/emptystate-files.png"
+                    image="https://cdn.shopify.com/s/files/1/0262/4074/files/emptystate-files.png" 
                   >
                     <p>When users leave comments with their feedback, they will appear here.</p>
                   </EmptyState>

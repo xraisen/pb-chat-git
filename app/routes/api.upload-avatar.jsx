@@ -54,7 +54,7 @@ export async function action({ request }) {
   if (!imageFile || typeof imageFile === 'string' || !imageFile.name || !imageFile.type) {
     return json({ error: "No file uploaded or invalid file data." }, { status: 400, headers: corsHeaders });
   }
-
+  
   if (imageFile.size === 0) {
     return json({ error: "Uploaded file is empty." }, { status: 400, headers: corsHeaders });
   }
@@ -79,17 +79,17 @@ export async function action({ request }) {
   console.log("--- MOCKING SHOPIFY FILE UPLOAD ---");
   const fileExtension = imageFile.name.split('.').pop() || 'png';
   // Use a placeholder shop ID or part of the shop domain for a more "realistic" mock URL
-  const mockShopIdForUrl = shop.split('.')[0].replace(/[^a-zA-Z0-9-]/g, '');
+  const mockShopIdForUrl = shop.split('.')[0].replace(/[^a-zA-Z0-9-]/g, ''); 
   const shopifyFileUrl = `https://cdn.shopify.com/s/files/1/${mockShopIdForUrl}/files/mock_avatar_${Date.now()}.${fileExtension}`;
   console.log("Mocked Shopify File URL:", shopifyFileUrl);
   // --- END MOCK ---
 
   try {
     await updateShopChatbotConfig(shop, { avatarUrl: shopifyFileUrl });
-    return json({
-      success: true,
-      avatarUrl: shopifyFileUrl,
-      message: "Avatar (mock) uploaded and configuration updated."
+    return json({ 
+      success: true, 
+      avatarUrl: shopifyFileUrl, 
+      message: "Avatar (mock) uploaded and configuration updated." 
     }, { headers: corsHeaders });
   } catch (error) {
     console.error("Error updating ShopChatbotConfig with new avatar URL:", error);

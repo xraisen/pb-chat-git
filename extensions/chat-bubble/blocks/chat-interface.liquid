@@ -38,7 +38,7 @@
     // UI related settings from block schema (will be overridden by API if successful)
     chatBubbleColor: {{ block.settings.chat_bubble_color | json }},
     welcomeMessage: {{ block.settings.welcome_message | json }},
-
+    
     // Non-UI settings that might be relevant as fallbacks or for initial state
     promptType: {{ block.settings.system_prompt | json }}, // Will be overridden by API's systemPromptKey
     llmProvider: {{ block.settings.llm_provider | json }}, // API doesn't send this, server handles LLM choice

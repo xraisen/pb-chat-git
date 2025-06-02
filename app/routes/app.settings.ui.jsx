@@ -1,12 +1,12 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react'; 
 import {
   Page, Layout, Card, FormLayout, TextField, Select, Button, BlockStack, ChoiceList, Banner, Collapsible, Icon, LegacyStack, Tooltip, Text as PolarisText, DropZone, Thumbnail
 } from '@shopify/polaris';
 import { TitleBar } from "@shopify/app-bridge-react";
 import { Form as RemixForm, useLoaderData, useActionData, useNavigation, json, useSubmit, useFetcher } from "@remix-run/react"; // Added useFetcher
-import { redirect } from "@remix-run/node";
+import { redirect } from "@remix-run/node"; 
 import { authenticate } from "../../shopify.server";
-import { InfoMinor } from '@shopify/polaris-icons';
+import { InfoMinor } from '@shopify/polaris-icons'; 
 import { getShopChatbotConfig, updateShopChatbotConfig } from "../../db.server.js";
 import fs from "fs/promises";
 import path from "path";
@@ -30,7 +30,7 @@ export const loader = async ({ request }) => {
     // Return default prompt keys or handle error as appropriate
     promptKeys = [{ label: "Standard Assistant (Default)", value: "standardAssistant" }];
   }
-
+  
   // If config has an error property from db.server.js, pass it through
   if (currentConfig.error && !loaderPageError) {
     loaderPageError = currentConfig.error;
@@ -57,7 +57,7 @@ export const action = async ({ request }) => {
       await updateShopChatbotConfig(shop, { avatarUrl: null });
       // It's important to also clear any potential file upload fields if they were part of this form submission.
       // For now, just returning success. The client will need to update its preview.
-      return json({ success: true, message: "Avatar removed.", anActionTookPlace: true });
+      return json({ success: true, message: "Avatar removed.", anActionTookPlace: true }); 
     } catch (error) {
       console.error("Failed to remove avatar:", error);
       return json({ errors: { general: "Failed to remove avatar." } }, { status: 500 });
@@ -65,7 +65,7 @@ export const action = async ({ request }) => {
   }
 
   // This is for the main form save. Avatar URL is handled by dedicated upload/remove actions.
-  const settingsData = {
+  const settingsData = { 
     // avatarUrl is NOT part of the main form submission data anymore.
     // It's updated via the dedicated upload API or the removeAvatar action.
     // The main save action here could potentially save the existing avatarUrl if no new file is staged.
@@ -134,7 +134,7 @@ export default function UISettingsPage() {
   const isSubmitting = navigation.state === "submitting";
 
   const { settings: initialSettings, promptKeys: loadedPromptKeys, pageError: loaderPageError } = loaderData;
-
+  
   // Use actionData if available (e.g., validation error), otherwise use loaderData
   const formErrors = actionData?.formErrors || {};
   const pageError = actionData?.pageError || loaderPageError;
@@ -167,13 +167,13 @@ export default function UISettingsPage() {
   const [customChatBubbleSVG, setCustomChatBubbleSVG] = useState(initialSettings.customChatBubbleSVG ?? "");
   const [chatBubbleSize, setChatBubbleSize] = useState(initialSettings.chatBubbleSize ?? "60px");
   const [chatBubbleColor, setChatBubbleColor] = useState(initialSettings.chatBubbleColor ?? "#E57399");
-
+  
   // Avatar State
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(initialSettings.avatarUrl || null);
   const [uploadError, setUploadError] = useState(null);
   // const [isRemovingAvatar, setIsRemovingAvatar] = useState(false); // Replaced by fetcher state
-  const submit = useSubmit();
+  const submit = useSubmit(); 
   const avatarUploadFetcher = useFetcher();
   const removeAvatarFetcher = useFetcher(); // Separate fetcher for remove action
 
@@ -190,7 +190,7 @@ export default function UISettingsPage() {
   const handleToggleColors = useCallback(() => setIsColorsOpen((open) => !open), []);
   const handleToggleAdvanced = useCallback(() => setIsAdvancedOpen((open) => !open), []);
   const toggleSystemPromptHelpModal = useCallback(() => setSystemPromptHelpModalOpen((active) => !active), []);
-
+  
   // Sync avatarUrl from loader to both avatarUrl state and avatarPreviewUrl state
   useEffect(() => {
     setAvatarUrl(initialSettings.avatarUrl || ""); // Update the main avatarUrl state for the form
@@ -204,8 +204,8 @@ export default function UISettingsPage() {
         setUploadStatusMessage(avatarUploadFetcher.data.message || "Avatar uploaded successfully!");
         setUploadStatusTone("success");
         setAvatarUrl(avatarUploadFetcher.data.avatarUrl); // Update main avatarUrl state
-        setAvatarPreviewUrl(avatarUploadFetcher.data.avatarUrl);
-        setAvatarFile(null);
+        setAvatarPreviewUrl(avatarUploadFetcher.data.avatarUrl); 
+        setAvatarFile(null); 
       } else {
         setUploadStatusMessage(avatarUploadFetcher.data.error || "Upload failed. Please try again.");
         setUploadStatusTone("critical");
@@ -215,7 +215,7 @@ export default function UISettingsPage() {
       setUploadStatusTone("info");
     }
   }, [avatarUploadFetcher.state, avatarUploadFetcher.data, setAvatarUrl]);
-
+  
   // Handle remove avatar fetcher state
    useEffect(() => {
     if (removeAvatarFetcher.state === 'idle' && removeAvatarFetcher.data) {
@@ -244,7 +244,7 @@ export default function UISettingsPage() {
       if (acceptedFiles.length > 0) {
         const file = acceptedFiles[0];
         setAvatarFile(file); // This file should be uploaded on main form submit or dedicated button
-        setAvatarPreviewUrl(URL.createObjectURL(file));
+        setAvatarPreviewUrl(URL.createObjectURL(file)); 
         setUploadError(null);
         // To include this in the main form submit, we'd need to use a file input or FormData append.
         // For now, this state is for preview. Real upload is next step.
@@ -268,7 +268,7 @@ export default function UISettingsPage() {
       setUploadStatusTone("warning");
       return;
     }
-
+    
     setUploadStatusMessage("Uploading avatar...");
     setUploadStatusTone("info");
     setUploadError(null);
@@ -279,13 +279,13 @@ export default function UISettingsPage() {
     avatarUploadFetcher.submit(uploadFormData, {
       method: "post",
       encType: "multipart/form-data",
-      action: "/api/upload-avatar",
+      action: "/api/upload-avatar", 
     });
   }, [avatarFile, avatarUploadFetcher]);
 
 
   const handleSystemPromptChange = useCallback((value) => setSystemPromptKey(value), []);
-  const handlePositionChange = useCallback((value) => setPosition(value), []);
+  const handlePositionChange = useCallback((value) => setPosition(value), []); 
   const handleProductDisplayModeChange = useCallback((value) => setProductDisplayMode(value), []);
   const handleChatBubbleIconChange = useCallback((value) => setChatBubbleIcon(value), []);
 
@@ -310,7 +310,7 @@ export default function UISettingsPage() {
     { label: "Carousel View", value: "carousel" },
     { label: "Combo View (Card + Carousel)", value: "combo" },
   ];
-
+  
   return (
     <Page title="Chatbot UI Settings">
       <TitleBar title="Chatbot UI Settings" />
@@ -333,22 +333,22 @@ export default function UISettingsPage() {
                       <TextField label="Welcome Message" name="welcomeMessage" value={welcomeMessage} onChange={setWelcomeMessage} multiline={3} autoComplete="off" />
                     </FormLayout.Group>
                     <FormLayout.Group>
-                       <Select
-                          label="System Prompt"
-                          name="systemPromptKey"
-                          options={systemPromptOptions}
-                          value={systemPromptKey}
-                          onChange={handleSystemPromptChange}
+                       <Select 
+                          label="System Prompt" 
+                          name="systemPromptKey" 
+                          options={systemPromptOptions} 
+                          value={systemPromptKey} 
+                          onChange={handleSystemPromptChange} 
                           helpText="Defines the AI's personality and instructions. Select 'Custom' to write your own."
                         />
-                      {systemPromptKey === 'custom' && (
-                        <TextField
-                          label="Custom System Prompt"
-                          name="customSystemPrompt"
-                          value={customSystemPrompt}
-                          onChange={setCustomSystemPrompt}
-                          multiline={6}
-                          autoComplete="off"
+                      {systemPromptKey === 'custom' && ( 
+                        <TextField 
+                          label="Custom System Prompt" 
+                          name="customSystemPrompt" 
+                          value={customSystemPrompt} 
+                          onChange={setCustomSystemPrompt} 
+                          multiline={6} 
+                          autoComplete="off" 
                           helpText="Write your detailed system prompt here. Refer to LLM documentation for best practices."
                         />
                       )}
@@ -375,7 +375,7 @@ export default function UISettingsPage() {
                 </BlockStack>
               </Card>
 
-              <Card>
+              <Card> 
                 <BlockStack gap="300" padding="400"> {/* Padding for Card content if header is used */}
                     <div style={{display: 'flex', justifyContent: 'space-between', cursor: 'pointer'}} onClick={handleToggleColors}>
                         <PolarisText variant="headingMd" as="h2">Widget Colors</PolarisText>
@@ -413,22 +413,22 @@ export default function UISettingsPage() {
                             <FormLayout.Group title="Chat Bubble">
                                 <Select label="Chat Bubble Icon" name="chatBubbleIcon" options={chatBubbleIconOptions} value={chatBubbleIcon} onChange={handleChatBubbleIconChange} />
                                 {chatBubbleIcon === 'custom' && (
-                                <TextField
-                                  label="Custom Chat Bubble SVG"
-                                  name="customChatBubbleSVG"
-                                  value={customChatBubbleSVG}
-                                  onChange={setCustomChatBubbleSVG}
-                                  multiline={4}
-                                  autoComplete="off"
+                                <TextField 
+                                  label="Custom Chat Bubble SVG" 
+                                  name="customChatBubbleSVG" 
+                                  value={customChatBubbleSVG} 
+                                  onChange={setCustomChatBubbleSVG} 
+                                  multiline={4} 
+                                  autoComplete="off" 
                                   helpText="Paste valid SVG code. Ensure it's sized and uses `currentColor` for fill to inherit color."
                                 />
                                 )}
-                                <TextField
-                                  label="Chat Bubble Size (px)"
-                                  name="chatBubbleSize"
-                                  value={chatBubbleSize}
-                                  onChange={setChatBubbleSize}
-                                  autoComplete="off"
+                                <TextField 
+                                  label="Chat Bubble Size (px)" 
+                                  name="chatBubbleSize" 
+                                  value={chatBubbleSize} 
+                                  onChange={setChatBubbleSize} 
+                                  autoComplete="off" 
                                   helpText="Size of the chat bubble button (e.g., 60px)."
                                 />
                                 <TextField label="Chat Bubble Color (Hex)" name="chatBubbleColor" value={chatBubbleColor} onChange={setChatBubbleColor} autoComplete="off" />
@@ -439,8 +439,8 @@ export default function UISettingsPage() {
                 </Card>
                  <Card title="Chatbot Avatar">
                   <BlockStack gap="400" padding="400">
-                    <DropZone
-                        label="Avatar Image"
+                    <DropZone 
+                        label="Avatar Image" 
                         onDrop={handleAvatarDrop}
                         accept="image/jpeg, image/png, image/gif"
                         type="image"
@@ -467,20 +467,20 @@ export default function UISettingsPage() {
                       </Banner>
                     )}
                     {/* <input type="hidden" name="avatarUrl" value={avatarUrl || ""} /> Removed, avatarUrl is not part of main form save */}
-
+                    
                     <LegacyStack distribution="trailing" spacing="tight">
                        {avatarPreviewUrl && (
-                        <Button
-                          onClick={handleRemoveAvatar}
-                          destructive
+                        <Button 
+                          onClick={handleRemoveAvatar} 
+                          destructive 
                           loading={removeAvatarFetcher.state === "submitting"}
                         >
                           Remove Avatar
                         </Button>
                        )}
-                       <Button
-                         primary
-                         onClick={handleAvatarUpload}
+                       <Button 
+                         primary 
+                         onClick={handleAvatarUpload} 
                          loading={avatarUploadFetcher.state === "submitting"}
                          disabled={!avatarFile}
                        >
@@ -516,14 +516,14 @@ export default function UISettingsPage() {
                         <Collapsible open={isAdvancedOpen} id="advanced-collapsible">
                             <FormLayout>
                                 <FormLayout.Group>
-                                    <TextField
-                                      label="Custom CSS Overrides"
-                                      name="customCSS"
-                                      value={customCSS}
-                                      onChange={setCustomCSS}
-                                      multiline={6}
-                                      autoComplete="off"
-                                      helpText="Apply custom CSS. Prefix selectors with your widget's main class/ID to scope styles. Use with caution."
+                                    <TextField 
+                                      label="Custom CSS Overrides" 
+                                      name="customCSS" 
+                                      value={customCSS} 
+                                      onChange={setCustomCSS} 
+                                      multiline={6} 
+                                      autoComplete="off" 
+                                      helpText="Apply custom CSS. Prefix selectors with your widget's main class/ID to scope styles. Use with caution." 
                                     />
                                 </FormLayout.Group>
                             </FormLayout>
