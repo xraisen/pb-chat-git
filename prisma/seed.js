@@ -23,7 +23,7 @@ async function main() {
     width: "450px",
     height: "70vh",
     zIndex: "9999",
-    position: "right",
+    position: "right", 
     bgColor: "#FFFFFF",
     textColor: "#333333",
     buttonColor: "#E57399",
@@ -34,15 +34,15 @@ async function main() {
     assistantMsgBgColor: "#F8F9FA",
     assistantMsgTextColor: "#333333",
     customCSS: null,
-    avatarUrl: null,
+    avatarUrl: null, 
 
     // Product Display
-    productDisplayMode: "card",
+    productDisplayMode: "card", 
     maxProductsToDisplay: 3,
     carouselItemWidth: "180px",
 
     // Chat Bubble Appearance
-    chatBubbleIcon: "default",
+    chatBubbleIcon: "default", 
     customChatBubbleSVG: null,
     chatBubbleSize: "60px",
     chatBubbleColor: "#E57399",
@@ -83,7 +83,7 @@ async function main() {
     },
   });
   console.log(`Seeded PromotionalMessage with ID: ${seededPromoMsg.id}`);
-
+  
   // Example PromotionalProduct (Optional)
    const seededPromoProd = await prisma.promotionalProduct.upsert({
     where: { id: 'seed-promo-prod-example' },

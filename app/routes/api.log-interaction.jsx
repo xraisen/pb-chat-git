@@ -45,7 +45,7 @@ export async function action({ request }) {
       { status: 400, headers: corsHeaders }
     );
   }
-
+  
   // Basic validation for shopDomain format (optional but good practice)
   // Using a simple regex here, adjust if shop can be just ID or other formats
   if (typeof shop !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shop) && !/^\d+$/.test(shop) ) {

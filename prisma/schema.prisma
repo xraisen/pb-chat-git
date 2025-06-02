@@ -83,7 +83,7 @@ model CustomerAccountUrl {
 model ShopChatbotConfig {
   id                      String    @id @default(cuid())
   shop                    String    @unique
-
+  
   // LLM and API Key settings (existing)
   llmProvider             String?   @default("gemini")
   geminiApiKey            String? // Encrypted
@@ -96,7 +96,7 @@ model ShopChatbotConfig {
   customSystemPrompt      String?   @db.Text // For potentially longer custom prompts
   promptHeadOverride      String?   @db.Text // For prepending to the final system prompt
   promptTailOverride      String?   @db.Text // For appending to the final system prompt
-
+  
   // Chat Widget Appearance & Positioning
   width                   String?   @default("450px")
   height                  String?   @default("70vh")

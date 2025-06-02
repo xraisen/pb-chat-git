@@ -30,7 +30,7 @@ function encrypt(text) {
   } catch (error) {
     console.error("Encryption failed:", error);
     // Depending on policy, you might want to return null, throw, or return the original text
-    return null;
+    return null; 
   }
 }
 
@@ -51,7 +51,7 @@ function decrypt(text) {
   } catch (error) {
     console.error("Decryption failed:", error);
     // It's common to return null if decryption fails, e.g. due to wrong key or corrupt data
-    return null;
+    return null; 
   }
 }
 
@@ -152,7 +152,7 @@ export async function updateShopChatbotConfig(shop, data) {
     llmProvider: llmProvider !== undefined ? llmProvider : defaultShopChatbotConfig.llmProvider,
     geminiApiKey: (geminiApiKey && typeof geminiApiKey === 'string') ? encrypt(geminiApiKey) : (geminiApiKey === '' || geminiApiKey === null ? null : undefined),
     claudeApiKey: (claudeApiKey && typeof claudeApiKey === 'string') ? encrypt(claudeApiKey) : (claudeApiKey === '' || claudeApiKey === null ? null : undefined),
-
+    
     // Chatbot Persona & Behavior
     botName: botName !== undefined ? botName : defaultShopChatbotConfig.botName,
     welcomeMessage: welcomeMessage !== undefined ? welcomeMessage : defaultShopChatbotConfig.welcomeMessage,
@@ -196,7 +196,7 @@ export async function updateShopChatbotConfig(shop, data) {
     chatBubbleSize: chatBubbleSize !== undefined ? chatBubbleSize : defaultShopChatbotConfig.chatBubbleSize,
     chatBubbleColor: chatBubbleColor !== undefined ? chatBubbleColor : defaultShopChatbotConfig.chatBubbleColor,
   };
-
+  
   // Filter out undefined values from dataToUpsert to avoid Prisma errors for optional fields not being updated
   const updatePayload = Object.fromEntries(Object.entries(dataToUpsert).filter(([_, v]) => v !== undefined));
 
@@ -253,7 +253,7 @@ export async function getChatInteractionStats(shop) {
       //   _count: {id: 'desc'}
       // }
     });
-
+    
     // Mocking interactionsOverTime for now as proper aggregation is complex
     const interactionsOverTime = [
       { date: new Date(Date.now() - 6*24*60*60*1000).toISOString().split('T')[0], count: Math.floor(totalInteractions / 7) + (chatOpenedCount % 5) },
@@ -296,7 +296,7 @@ export async function getRecentChatInteractions(shop, limit = 5) {
         id: true,
         eventType: true,
         timestamp: true,
-        conversationId: true,
+        conversationId: true, 
         // eventDetail: true, // Optionally include if you want to display some details
       }
     });
@@ -506,7 +506,7 @@ export async function createMessageFeedback(shop, data) {
     });
   } catch (error) {
     console.error(`Error creating message feedback for shop ${shop}:`, error);
-    throw error;
+    throw error; 
   }
 }
 
@@ -529,7 +529,7 @@ export async function getMessageFeedbackStats(shop) {
       upvotes,
       downvotes,
       totalFeedback,
-      positiveFeedbackPercentage: parseFloat(positiveFeedbackPercentage.toFixed(1)),
+      positiveFeedbackPercentage: parseFloat(positiveFeedbackPercentage.toFixed(1)), 
     };
   } catch (error) {
     console.error(`Error fetching message feedback stats for shop ${shop}:`, error);
@@ -546,22 +546,22 @@ export async function getRecentMessageFeedback(shop, limit = 10) {
     return await prisma.messageFeedback.findMany({
       where: {
         shop,
-        comment: { not: null },
+        comment: { not: null }, 
       },
       orderBy: { timestamp: 'desc' },
       take: limit,
-      select: {
+      select: { 
         id: true,
         timestamp: true,
         rating: true,
         comment: true,
-        messageContent: true,
+        messageContent: true, 
         conversationId: true,
       }
     });
   } catch (error) {
     console.error(`Error fetching recent message feedback for shop ${shop}:`, error);
-    return [];
+    return []; 
   }
 }
 

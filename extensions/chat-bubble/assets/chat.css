@@ -430,7 +430,7 @@
     overflow-y: auto;
     scroll-snap-type: none;
   }
-
+  
   /* General Product Card Styling */
   .shop-ai-product-card {
     background: var(--chatbot-card-bg-color, white); /* Use CSS Var */

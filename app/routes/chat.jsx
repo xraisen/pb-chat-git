@@ -7,7 +7,7 @@ import MCPClient from "../mcp-client";
 import { saveMessage, getConversationHistory, storeCustomerAccountUrl, getCustomerAccountUrl, getShopChatbotConfig } from "../db.server.js"; // getAppConfiguration changed to getShopChatbotConfig
 import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
-import { createClaudeService } from "../services/claude.server.js";
+import { createClaudeService } from "../services/claude.server.js"; 
 import { createGeminiService } from "../services/gemini.server.js";
 // import { getAppConfiguration } from "../db.server.js"; // Replaced by getShopChatbotConfig
 import prisma from "../db.server.js"; // For logging
@@ -167,7 +167,7 @@ async function handleChatSession({
     return;
   }
 
-  const appConfig = await getShopChatbotConfig(shopDomain);
+  const appConfig = await getShopChatbotConfig(shopDomain); 
 
   // Construct Final System Prompt
   let basePromptContent = '';
@@ -175,7 +175,7 @@ async function handleChatSession({
     basePromptContent = appConfig.customSystemPrompt;
     logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_CUSTOM", { length: basePromptContent.length });
   } else {
-    let keyToUse = AppConfig.api.defaultPromptType;
+    let keyToUse = AppConfig.api.defaultPromptType; 
     if (appConfig && appConfig.systemPromptKey) {
       keyToUse = appConfig.systemPromptKey;
     }
@@ -192,7 +192,7 @@ async function handleChatSession({
            logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_DEFAULT_KEY", { key: AppConfig.api.defaultPromptType });
         } else {
            console.error(`Default system prompt key "${AppConfig.api.defaultPromptType}" also not found in prompts.json! Using hardcoded fallback.`);
-           basePromptContent = "You are a helpful assistant.";
+           basePromptContent = "You are a helpful assistant."; 
            logChatInteraction(shopDomain, conversationId, "SYSTEM_PROMPT_USED_HARDCODED_FALLBACK");
         }
       }
@@ -248,7 +248,7 @@ async function handleChatSession({
       apiKey = appConfig.claudeApiKey;
     }
   }
-
+  
   // 3. If still no apiKey, and admin had a preferred provider, it means the key for that provider is missing.
   if (!apiKey && appConfig?.llmProvider) {
     console.error(`Admin preferred LLM provider (${appConfig.llmProvider}) is set for ${shopDomain}, but its API key is missing or invalid.`);
@@ -376,8 +376,8 @@ async function handleChatSession({
           
           saveMessage(conversationId, roleToSave, JSON.stringify(messageToSave))
             .then(() => {
-              logChatInteraction(shopDomain, conversationId, "ASSISTANT_MESSAGE_SAVED", {
-                messageLength: typeof messageToSave === 'string' ? messageToSave.length : JSON.stringify(messageToSave).length,
+              logChatInteraction(shopDomain, conversationId, "ASSISTANT_MESSAGE_SAVED", { 
+                messageLength: typeof messageToSave === 'string' ? messageToSave.length : JSON.stringify(messageToSave).length, 
                 role: roleToSave,
                 llmProvider: selectedLlmProvider // Log which LLM was used
               });
@@ -410,7 +410,7 @@ async function handleChatSession({
           tools: mcpClient.tools,
           conversationId
         },
-        { sendMessage: stream.sendMessage }
+        { sendMessage: stream.sendMessage } 
       );
 
       // After the initial stream, check if a tool call was signaled by the wrapper
@@ -429,7 +429,7 @@ async function handleChatSession({
             console.error(`[handleChatSession] MCP Tool Error for ${toolName}:`, mcpResponse.error);
             toolExecutionResult = { error: true, message: mcpResponse.error.data || "Tool execution failed", details: mcpResponse.error };
           } else {
-            toolExecutionResult = mcpResponse;
+            toolExecutionResult = mcpResponse; 
             // Check if tool response contains a checkoutUrl and append UTMs
             if (toolExecutionResult && toolExecutionResult.checkoutUrl && typeof toolExecutionResult.checkoutUrl === 'string') {
               toolExecutionResult.checkoutUrl = appendUtmParameters(toolExecutionResult.checkoutUrl, activeUtmParams);
@@ -458,14 +458,14 @@ async function handleChatSession({
         });
       }
     } else { // Claude provider
-      await llmService.streamConversation(
+      await llmService.streamConversation( 
         {
           messages: conversationHistory,
           systemInstruction: finalSystemPrompt, // Pass constructed prompt
           // promptType, // Remove if systemInstruction replaces its role
           tools: mcpClient.tools
         },
-        {
+        { 
           onText: (textDelta) => {
             stream.sendMessage({ type: 'chunk', chunk: textDelta });
           },
@@ -485,7 +485,7 @@ async function handleChatSession({
             // The onMessage handler above should have caught it if it was part of message.content.
             await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_INITIATED_${toolName.toUpperCase()}`, { args: toolArgs, llmProvider: selectedLlmProvider });
             const mcpResponse = await mcpClient.callTool(toolName, toolArgs);
-
+            
             // Check if tool response contains a checkoutUrl and append UTMs
             let processedMcpResponse = mcpResponse;
             if (mcpResponse && !mcpResponse.error && mcpResponse.checkoutUrl && typeof mcpResponse.checkoutUrl === 'string') {
@@ -498,7 +498,7 @@ async function handleChatSession({
             await logChatInteraction(shopDomain, conversationId, `TOOL_CALL_COMPLETED_${toolName.toUpperCase()}`, { success: !processedMcpResponse.error, responseOutput: processedMcpResponse });
 
             if (processedMcpResponse.error) { // Use processedMcpResponse here
-              await toolService.handleToolError(
+              await toolService.handleToolError( 
                 processedMcpResponse,
                 toolName,
                 toolUseId,
